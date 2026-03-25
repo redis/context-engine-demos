@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from dotenv import load_dotenv
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+ENV_PATH = ROOT_DIR / ".env"
+if ENV_PATH.exists():
+    load_dotenv(ENV_PATH)
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    openai_api_key: str = Field(default="")
+    openai_chat_model: str = Field(default="gpt-4o")
+    openai_embedding_model: str = Field(default="text-embedding-3-small")
+
+    redis_host: str = Field(default="localhost")
+    redis_port: int = Field(default=6379)
+    redis_username: str = Field(default="default")
+    redis_password: str = Field(default="")
+    redis_db: int = Field(default=0)
+    redis_ssl: bool = Field(default=False)
+
+    ctx_admin_key: str = Field(default="")
+    mcp_agent_key: str = Field(default="")
+    ctx_surface_id: str = Field(default="")
+    ctx_redis_instance_id: str = Field(default="")
+
+    backend_host: str = Field(default="127.0.0.1")
+    backend_port: int = Field(default=8040)
+    cors_origin: str = Field(default="http://localhost:3040")
+
+
+def get_settings() -> Settings:
+    return Settings()
+
