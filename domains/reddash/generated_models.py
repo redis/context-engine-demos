@@ -1,4 +1,4 @@
-"""Generated Reddish data models for the food-delivery demo."""
+"""Generated Context Surface models for the Reddash domain."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from context_surfaces.context_model import ContextField, ContextModel, ContextRe
 
 
 class Customer(ContextModel):
-    """Customer entity for the Reddish delivery demo."""
+    """Customer entity for the Reddash domain."""
 
     __redis_key_template__ = "reddash_customer:{customer_id}"
 
@@ -70,7 +70,7 @@ class Customer(ContextModel):
 
 
 class Restaurant(ContextModel):
-    """Restaurant entity for the Reddish delivery demo."""
+    """Restaurant entity for the Reddash domain."""
 
     __redis_key_template__ = "reddash_restaurant:{restaurant_id}"
 
@@ -122,7 +122,7 @@ class Restaurant(ContextModel):
 
 
 class Driver(ContextModel):
-    """Driver entity for the Reddish delivery demo."""
+    """Driver entity for the Reddash domain."""
 
     __redis_key_template__ = "reddash_driver:{driver_id}"
 
@@ -178,7 +178,7 @@ class Driver(ContextModel):
 
 
 class Order(ContextModel):
-    """Order entity for the Reddish delivery demo."""
+    """Order entity for the Reddash domain."""
 
     __redis_key_template__ = "reddash_order:{order_id}"
 
@@ -274,7 +274,7 @@ class Order(ContextModel):
 
 
 class OrderItem(ContextModel):
-    """OrderItem entity for the Reddish delivery demo."""
+    """OrderItem entity for the Reddash domain."""
 
     __redis_key_template__ = "reddash_order_item:{item_id}"
 
@@ -318,7 +318,7 @@ class OrderItem(ContextModel):
 
 
 class DeliveryEvent(ContextModel):
-    """DeliveryEvent entity for the Reddish delivery demo."""
+    """DeliveryEvent entity for the Reddash domain."""
 
     __redis_key_template__ = "reddash_delivery_event:{event_id}"
 
@@ -358,7 +358,7 @@ class DeliveryEvent(ContextModel):
 
 
 class Payment(ContextModel):
-    """Payment entity for the Reddish delivery demo."""
+    """Payment entity for the Reddash domain."""
 
     __redis_key_template__ = "reddash_payment:{payment_id}"
 
@@ -449,7 +449,7 @@ class Payment(ContextModel):
 
 
 class SupportTicket(ContextModel):
-    """SupportTicket entity for the Reddish delivery demo."""
+    """SupportTicket entity for the Reddash domain."""
 
     __redis_key_template__ = "reddash_support_ticket:{ticket_id}"
 
@@ -507,7 +507,7 @@ class SupportTicket(ContextModel):
 
 
 class Policy(ContextModel):
-    """Policy entity for the Reddish delivery demo."""
+    """Policy entity for the Reddash domain."""
 
     __redis_key_template__ = "reddash_policy:{policy_id}"
 

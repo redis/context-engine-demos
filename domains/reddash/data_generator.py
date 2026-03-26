@@ -1,27 +1,25 @@
-"""Generate sample data for the Reddish delivery demo.
-
-Outputs JSONL files into ``output/`` and writes demo-user identity into ``.env``.
-All timestamps are relative to now() in UTC so the "late order" scenario is
-always fresh.
-"""
+"""Generate sample data for the Reddash delivery demo."""
 
 from __future__ import annotations
 
 import json
 import os
 import sys
+from hashlib import sha256
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import openai
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parents[1]
+from backend.app.core.domain_contract import GeneratedDataset
+
+ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-OUTPUT_DIR = ROOT / "output"
+OUTPUT_DIR = ROOT / "output" / "reddash"
 
 
 def ts(dt: datetime) -> str:
@@ -32,11 +30,18 @@ now = datetime.now(timezone.utc)
 
 
 def embed(texts: list[str]) -> list[list[float]]:
+    if not os.getenv("OPENAI_API_KEY"):
+        return [fake_embedding(text) for text in texts]
     client = openai.OpenAI()
     resp = client.embeddings.create(
         input=texts, model=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
     )
     return [item.embedding for item in resp.data]
+
+
+def fake_embedding(text: str) -> list[float]:
+    digest = sha256(text.encode("utf-8")).digest()
+    return [digest[i % len(digest)] / 255.0 for i in range(1536)]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -416,7 +421,7 @@ POLICIES_TEXT = [
     {"policy_id": "POL_007", "title": "Driver Delay Compensation", "category": "delivery",
      "content": (
          "When delivery delays are caused by driver-side issues (vehicle breakdown, navigation "
-         "error, multi-order batching), Reddish will automatically apply a credit. Credit amount: "
+         "error, multi-order batching), Reddash will automatically apply a credit. Credit amount: "
          "10-20 min delay = 10% credit, 20-30 min = 20% credit, 30+ min = full refund eligibility. "
          "Premium members receive 1.5x the standard credit."
      )},
@@ -433,8 +438,8 @@ POLICIES_TEXT = [
 #  MAIN — generate embeddings + write JSONL files
 # ═══════════════════════════════════════════════════════════════════════════
 
-def write_jsonl(filename: str, rows: list[dict]) -> None:
-    path = OUTPUT_DIR / filename
+def write_jsonl(output_dir: Path, filename: str, rows: list[dict]) -> None:
+    path = output_dir / filename
     with path.open("w") as fh:
         for row in rows:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -459,8 +464,15 @@ def update_env(key: str, value: str) -> None:
     env_path.write_text("\n".join(lines) + "\n")
 
 
-def main() -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def generate_demo_data(
+    *,
+    output_dir: Path | None = None,
+    seed: int | None = None,
+    update_env_file: bool = True,
+) -> GeneratedDataset:
+    del seed
+    resolved_output_dir = output_dir or OUTPUT_DIR
+    resolved_output_dir.mkdir(parents=True, exist_ok=True)
 
     print("Generating embeddings for policies...")
     contents = [p["content"] for p in POLICIES_TEXT]
@@ -468,22 +480,47 @@ def main() -> None:
     policies = [{**p, "content_embedding": emb} for p, emb in zip(POLICIES_TEXT, embeddings)]
 
     print("Writing JSONL files:")
-    write_jsonl("customers.jsonl", CUSTOMERS)
-    write_jsonl("restaurants.jsonl", RESTAURANTS)
-    write_jsonl("drivers.jsonl", DRIVERS)
-    write_jsonl("orders.jsonl", ORDERS)
-    write_jsonl("order_items.jsonl", ORDER_ITEMS)
-    write_jsonl("delivery_events.jsonl", DELIVERY_EVENTS)
-    write_jsonl("payments.jsonl", PAYMENTS)
-    write_jsonl("support_tickets.jsonl", SUPPORT_TICKETS)
-    write_jsonl("policies.jsonl", policies)
+    write_jsonl(resolved_output_dir, "customers.jsonl", CUSTOMERS)
+    write_jsonl(resolved_output_dir, "restaurants.jsonl", RESTAURANTS)
+    write_jsonl(resolved_output_dir, "drivers.jsonl", DRIVERS)
+    write_jsonl(resolved_output_dir, "orders.jsonl", ORDERS)
+    write_jsonl(resolved_output_dir, "order_items.jsonl", ORDER_ITEMS)
+    write_jsonl(resolved_output_dir, "delivery_events.jsonl", DELIVERY_EVENTS)
+    write_jsonl(resolved_output_dir, "payments.jsonl", PAYMENTS)
+    write_jsonl(resolved_output_dir, "support_tickets.jsonl", SUPPORT_TICKETS)
+    write_jsonl(resolved_output_dir, "policies.jsonl", policies)
 
     demo = CUSTOMERS[0]
-    update_env("DEMO_USER_ID", demo["customer_id"])
-    update_env("DEMO_USER_NAME", demo["name"])
-    update_env("DEMO_USER_EMAIL", demo["email"])
+    if update_env_file:
+        update_env("DEMO_USER_ID", demo["customer_id"])
+        update_env("DEMO_USER_NAME", demo["name"])
+        update_env("DEMO_USER_EMAIL", demo["email"])
     print(f"\nDemo user: {demo['name']} ({demo['customer_id']})")
     print("Done.")
+
+    return GeneratedDataset(
+        output_dir=str(resolved_output_dir),
+        env_updates={
+            "DEMO_USER_ID": demo["customer_id"],
+            "DEMO_USER_NAME": demo["name"],
+            "DEMO_USER_EMAIL": demo["email"],
+        },
+        summary={
+            "customers": len(CUSTOMERS),
+            "restaurants": len(RESTAURANTS),
+            "drivers": len(DRIVERS),
+            "orders": len(ORDERS),
+            "order_items": len(ORDER_ITEMS),
+            "delivery_events": len(DELIVERY_EVENTS),
+            "payments": len(PAYMENTS),
+            "support_tickets": len(SUPPORT_TICKETS),
+            "policies": len(POLICIES_TEXT),
+        },
+    )
+
+
+def main() -> None:
+    generate_demo_data(output_dir=OUTPUT_DIR)
 
 
 if __name__ == "__main__":

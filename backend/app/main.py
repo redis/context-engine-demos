@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from time import perf_counter
 from typing import Any, AsyncIterator
 
@@ -9,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from backend.app.context_surface_service import ContextSurfaceService
+from backend.app.core.domain_loader import get_active_domain
 from backend.app.contracts import ChatRequest
 from backend.app.internal_tools import InternalToolService, internal_tool_names
 from backend.app.langgraph_agent import create_agent, create_checkpointer
@@ -16,7 +18,9 @@ from backend.app.rag_service import SimpleRAGService
 from backend.app.settings import get_settings
 
 settings = get_settings()
-app = FastAPI(title="Reddish Delivery Demo")
+domain = get_active_domain(settings)
+ROOT_DIR = Path(__file__).resolve().parents[2]
+app = FastAPI(title=f"{domain.manifest.branding.app_name} Demo")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.cors_origin, "http://localhost:3040", "http://127.0.0.1:3040"],
@@ -74,8 +78,24 @@ def _tool_kind(name: str) -> str:
 async def health() -> JSONResponse:
     return JSONResponse({
         "ok": True,
+        "domain": domain.manifest.id,
         "mcp_enabled": bool(settings.mcp_agent_key),
-        "internal_tools": internal_tool_names(),
+        "internal_tools": internal_tool_names(settings),
+    })
+
+
+@app.get("/api/domain-config")
+async def domain_config() -> JSONResponse:
+    branding = domain.manifest.branding
+    return JSONResponse({
+        "id": domain.manifest.id,
+        "app_name": branding.app_name,
+        "subtitle": branding.subtitle,
+        "hero_title": branding.hero_title,
+        "placeholder_text": branding.placeholder_text,
+        "starter_prompts": [card.model_dump() for card in branding.starter_prompts],
+        "theme": branding.theme.model_dump(),
+        "logo_svg": (ROOT_DIR / branding.logo_path).read_text(),
     })
 
 

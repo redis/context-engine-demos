@@ -1,17 +1,21 @@
 BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8040
 FRONTEND_PORT ?= 3040
+DOMAIN ?= reddash
 
 .PHONY: help install backend-install frontend-install dev backend frontend \
-	generate-data generate-models load-data setup-surface flush-redis reset
+	generate-data generate-models load-data setup-surface validate-domain smoke-domain create-domain flush-redis reset
 
 help:
 	@echo "Targets:"
 	@echo "  make install          Install backend and frontend dependencies"
-	@echo "  make generate-models  Regenerate Context Surface model file from schema"
-	@echo "  make generate-data    Generate sample JSONL data into output/"
+	@echo "  make generate-models  Regenerate Context Surface model file for DOMAIN=$(DOMAIN)"
+	@echo "  make generate-data    Generate sample JSONL data into output/DOMAIN"
 	@echo "  make setup-surface    Register Redis, create surface & agent key via ctxctl"
-	@echo "  make load-data        Load output/*.jsonl into Redis JSON + Search indexes"
+	@echo "  make load-data        Load output/DOMAIN/*.jsonl into Redis + Search indexes"
+	@echo "  make validate-domain  Validate the active domain pack"
+	@echo "  make smoke-domain     Generate models/data and verify the domain structure"
+	@echo "  make create-domain    Scaffold a new domain pack for DOMAIN=$(DOMAIN)"
 	@echo "  make flush-redis      Flush the Redis database (FLUSHDB)"
 	@echo "  make reset            Flush Redis + recreate surface + reload data"
 	@echo "  make backend          Start FastAPI backend"
@@ -27,16 +31,25 @@ frontend-install:
 install: backend-install frontend-install
 
 generate-models:
-	@uv run python scripts/generate_reddash_models.py
+	@uv run python scripts/generate_models.py --domain $(DOMAIN)
 
 generate-data:
-	@uv run python scripts/generate_demo_data.py
+	@uv run python scripts/generate_data.py --domain $(DOMAIN)
 
 load-data:
-	@uv run python scripts/load_reddash_data.py
+	@uv run python scripts/load_data.py --domain $(DOMAIN)
 
 setup-surface:
-	@bash scripts/setup_context_surface.sh
+	@uv run python scripts/setup_surface.py --domain $(DOMAIN)
+
+validate-domain:
+	@uv run python scripts/validate_domain.py --domain $(DOMAIN)
+
+smoke-domain:
+	@uv run python scripts/smoke_domain.py --domain $(DOMAIN)
+
+create-domain:
+	@uv run python scripts/create_domain.py $(DOMAIN)
 
 backend:
 	@uv run uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)
@@ -66,4 +79,3 @@ reset: flush-redis
 
 dev:
 	@trap 'kill 0' EXIT; $(MAKE) backend & $(MAKE) frontend & wait
-

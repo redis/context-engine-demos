@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     backend_host: str = Field(default="127.0.0.1")
     backend_port: int = Field(default=8040)
     cors_origin: str = Field(default="http://localhost:3040")
+    demo_domain: str = Field(default="reddash")
 
 
 def get_settings() -> Settings:
     return Settings()
-
