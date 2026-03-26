@@ -135,6 +135,7 @@ def _build_post_model_hook(
         model=lightweight_model_name
         or getattr(model, "model_name", None)
         or getattr(model, "model", None),
+        temperature=0.2,
         api_key=getattr(model, "openai_api_key", None) or getattr(model, "api_key", None),
     )
     domain_guidance = ""
