@@ -41,8 +41,8 @@ button { cursor: pointer; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
 .topbar-left { display: flex; align-items: center; gap: 14px; }
 .brand { display: flex; align-items: center; gap: 12px; }
-.brand-logo { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; }
-.brand-logo svg, .hero-logo svg { width: 100%; height: 100%; }
+.brand-logo { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; overflow: hidden; }
+.brand-logo img, .hero-logo img { width: 100%; height: 100%; object-fit: cover; }
 .brand-copy { min-width: 0; }
 .brand-name { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; color: var(--accent); }
 .brand-subtitle { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em; }
@@ -63,7 +63,7 @@ button { cursor: pointer; }
 /* ── Hero ────────────────────────────────────────────── */
 .hero-panel { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px; }
 .hero-mark { width: 80px; height: 80px; border-radius: 24px; display: grid; place-items: center; background: linear-gradient(180deg, rgba(255,68,56,0.18), rgba(255,140,66,0.08)); border: 1px solid rgba(255,255,255,0.08); box-shadow: var(--shadow); }
-.hero-logo { width: 52px; height: 52px; border-radius: 14px; display: inline-flex; }
+.hero-logo { width: 52px; height: 52px; border-radius: 14px; display: inline-flex; overflow: hidden; }
 .hero-title { margin: 0; max-width: 720px; font-size: clamp(2.4rem, 4.5vw, 3.8rem); line-height: 0.95; font-weight: 800; letter-spacing: -0.055em; }
 
 /* ── Messages ────────────────────────────────────────── */
@@ -71,8 +71,76 @@ button { cursor: pointer; }
 .message-block { display: grid; gap: 12px; margin-bottom: 24px; }
 .message-block.user { justify-items: end; }
 .message-meta { color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
-.message-bubble { width: fit-content; max-width: min(860px, 100%); padding: 17px 20px; border-radius: 24px; border: 1px solid var(--line); background: var(--panel); line-height: 1.65; white-space: pre-wrap; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03); }
+.message-bubble { width: fit-content; max-width: min(860px, 100%); padding: 17px 20px; border-radius: 24px; border: 1px solid var(--line); background: var(--panel); line-height: 1.65; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03); }
 .message-block.user .message-bubble { background: var(--user); border-color: rgba(255,140,66,0.15); }
+.plain-text-message { white-space: pre-wrap; }
+.message-bubble > :first-child { margin-top: 0; }
+.message-bubble > :last-child { margin-bottom: 0; }
+.message-bubble p,
+.message-bubble ul,
+.message-bubble ol,
+.message-bubble blockquote,
+.message-bubble table,
+.message-bubble pre,
+.message-bubble h1,
+.message-bubble h2,
+.message-bubble h3,
+.message-bubble h4 { margin: 0 0 0.95em; }
+.message-bubble ul,
+.message-bubble ol { padding-left: 1.35rem; }
+.message-bubble li + li { margin-top: 0.28em; }
+.message-bubble a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.12); }
+.message-bubble a:hover { border-bottom-color: var(--accent); }
+.message-bubble strong { color: #ffffff; font-weight: 800; }
+.message-bubble em { color: var(--soft); }
+.message-bubble code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.92em;
+  padding: 0.12em 0.38em;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  color: #f8e0c8;
+}
+.message-bubble pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+.message-bubble blockquote {
+  padding-left: 1rem;
+  border-left: 3px solid var(--line-strong);
+  color: var(--soft);
+}
+.message-bubble table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+}
+.message-bubble th,
+.message-bubble td {
+  padding: 0.72rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.message-bubble th {
+  color: var(--soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgba(255,255,255,0.04);
+}
+.message-bubble tr:last-child td { border-bottom: 0; }
+.message-bubble hr {
+  margin: 1rem 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
 
 /* ── Status line (intermediate agent messages) ───────── */
 .status-line { width: fit-content; padding: 10px 16px; border-radius: 20px; background: rgba(255,140,66,0.06); border: 1px solid rgba(255,140,66,0.12); color: var(--soft); font-size: 0.9rem; animation: pulse 1.5s ease-in-out infinite; }

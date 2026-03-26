@@ -11,7 +11,7 @@ help:
 	@echo "  make install          Install backend and frontend dependencies"
 	@echo "  make generate-models  Regenerate Context Surface model file for DOMAIN=$(DOMAIN)"
 	@echo "  make generate-data    Generate sample JSONL data into output/DOMAIN"
-	@echo "  make setup-surface    Register Redis, create surface & agent key via ctxctl"
+	@echo "  make setup-surface    Create surface & agent key using embedded Redis connection settings"
 	@echo "  make load-data        Load output/DOMAIN/*.jsonl into Redis + Search indexes"
 	@echo "  make validate-domain  Validate the active domain pack"
 	@echo "  make smoke-domain     Generate models/data and verify the domain structure"

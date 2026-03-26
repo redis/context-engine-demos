@@ -1,4 +1,6 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type ChatRole = "user" | "assistant";
 
@@ -8,6 +10,7 @@ type ToolEvent = {
   status: "call" | "result";
   payload: Record<string, unknown>;
   durationMs?: number;
+  ts?: number;
 };
 
 type MergedToolEvent = {
@@ -16,9 +19,17 @@ type MergedToolEvent = {
   callPayload?: Record<string, unknown>;
   resultPayload?: Record<string, unknown>;
   durationMs?: number;
+  ts?: number;
 };
 
-type ThinkingStep = { text: string; ts?: number };
+type ThinkingStep = {
+  id: string;
+  text: string;
+  ts: number;
+  kind: "plan" | "llm";
+  durationMs?: number;
+  durationText?: string;
+};
 
 type StatusMessage = { text: string; ts: number };
 
@@ -51,7 +62,7 @@ type DomainConfig = {
   placeholder_text: string;
   starter_prompts: PromptCard[];
   theme: Record<string, string>;
-  logo_svg: string;
+  logo_src: string;
 } | null;
 
 const modeStorageKey = "demo-domain-mode";
@@ -73,6 +84,7 @@ function mergeToolEvents(events: ToolEvent[]): MergedToolEvent[] {
     if (ev.status === "result" && prev && prev.toolName === ev.toolName && prev.toolKind === ev.toolKind && prev.resultPayload === undefined) {
       prev.resultPayload = ev.payload;
       prev.durationMs = ev.durationMs ?? prev.durationMs;
+      prev.ts = prev.ts ?? ev.ts;
       continue;
     }
     merged.push({
@@ -80,21 +92,57 @@ function mergeToolEvents(events: ToolEvent[]): MergedToolEvent[] {
       callPayload: ev.status === "call" ? ev.payload : undefined,
       resultPayload: ev.status === "result" ? ev.payload : undefined,
       durationMs: ev.durationMs,
+      ts: ev.ts,
     });
   }
   return merged;
 }
 
-function BrandLogo({ svg, className = "brand-logo" }: { svg?: string; className?: string }) {
-  if (!svg) {
+type TraceTimelineEntry =
+  | { kind: "step"; index: number; ts: number; step: ThinkingStep }
+  | { kind: "tool"; index: number; ts: number; tool: MergedToolEvent };
+
+function buildTraceTimeline(steps: ThinkingStep[], tools: MergedToolEvent[]): TraceTimelineEntry[] {
+  const stepEntries = steps.map((step, index) => ({
+    kind: "step" as const,
+    index,
+    ts: step.ts ?? 0,
+    step,
+  }));
+  const toolEntries = tools.map((tool, index) => ({
+    kind: "tool" as const,
+    index,
+    ts: tool.ts ?? 0,
+    tool,
+  }));
+  return [...stepEntries, ...toolEntries].sort((a, b) => {
+    if (a.ts !== b.ts) return a.ts - b.ts;
+    if (a.kind !== b.kind) return a.kind === "step" ? -1 : 1;
+    return a.index - b.index;
+  });
+}
+
+function BrandLogo({ src, className = "brand-logo" }: { src?: string; className?: string }) {
+  if (!src) {
     return <div className={className} />;
   }
   return (
-    <span
-      className={className}
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <span className={className} aria-hidden="true">
+      <img src={src} alt="" />
+    </span>
+  );
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
   );
 }
 
@@ -132,6 +180,10 @@ export default function App() {
     Object.entries(domain.theme).forEach(([key, value]) => {
       document.documentElement.style.setProperty(`--${key.replaceAll("_", "-")}`, value);
     });
+  }, [domain]);
+
+  useEffect(() => {
+    document.title = domain?.app_name ?? "Domain Demo";
   }, [domain]);
 
   async function submitPrompt(prompt: string, event?: FormEvent) {
@@ -181,13 +233,34 @@ export default function App() {
                 case "status":
                   return { ...m, statusMessages: [...m.statusMessages, { text: ev.text, ts: ev.ts ?? 0 }] };
                 case "thinking-step":
-                  return { ...m, thinkingSteps: [...m.thinkingSteps, { text: ev.step, ts: ev.ts }] };
+                  return {
+                    ...m,
+                    thinkingSteps: [...m.thinkingSteps, {
+                      id: ev.stepId ?? `step-${m.thinkingSteps.length}-${ev.ts ?? 0}`,
+                      text: ev.step,
+                      ts: ev.ts ?? 0,
+                      kind: ev.stepKind === "llm" ? "llm" : "plan",
+                    }],
+                  };
+                case "thinking-step-finish":
+                  return {
+                    ...m,
+                    thinkingSteps: m.thinkingSteps.map((step) =>
+                      step.id === ev.stepId
+                        ? {
+                            ...step,
+                            durationMs: ev.durationMs,
+                            durationText: ev.durationText,
+                          }
+                        : step,
+                    ),
+                  };
                 case "tool-call":
                 case "tool-result":
                   return { ...m, toolEvents: [...m.toolEvents, {
                     toolName: ev.toolName, toolKind: ev.toolKind ?? "internal_function",
                     status: ev.type === "tool-call" ? "call" : "result",
-                    payload: ev.payload ?? {}, durationMs: ev.durationMs,
+                    payload: ev.payload ?? {}, durationMs: ev.durationMs, ts: ev.ts ?? 0,
                   }] };
                 case "text-delta":
                   return { ...m, content: m.content + (ev.delta ?? "") };
@@ -222,7 +295,7 @@ export default function App() {
         <header className="topbar">
           <div className="topbar-left">
             <div className="brand">
-              <BrandLogo svg={domain?.logo_svg} className="brand-logo" />
+              <BrandLogo src={domain?.logo_src} className="brand-logo" />
               <div className="brand-copy">
                 <div className="brand-name">{domain?.app_name ?? "Demo"}</div>
                 <div className="brand-subtitle">{domain?.subtitle ?? "Context Surfaces"}</div>
@@ -239,13 +312,14 @@ export default function App() {
           <div className={`conversation ${hasMessages ? "has-messages" : "is-empty"}`}>
             {!hasMessages && (
               <div className="hero-panel">
-                <div className="hero-mark"><BrandLogo svg={domain?.logo_svg} className="hero-logo" /></div>
+                <div className="hero-mark"><BrandLogo src={domain?.logo_src} className="hero-logo" /></div>
                 <h1 className="hero-title">{domain?.hero_title ?? "How can we help?"}</h1>
               </div>
             )}
 
             {messages.map((message) => {
               const toolRows = mergeToolEvents(message.toolEvents);
+              const traceTimeline = buildTraceTimeline(message.thinkingSteps, toolRows);
               const isAssistant = message.role === "assistant";
               const lastStatus = isAssistant && message.statusMessages.length > 0 ? message.statusMessages[message.statusMessages.length - 1] : null;
               const showStatus = isAssistant && !message.content && lastStatus;
@@ -254,12 +328,8 @@ export default function App() {
                   {showStatus && (
                     <div className="status-line">⏳ {lastStatus.text}</div>
                   )}
-                  {message.content && <div className="message-bubble">{message.content}</div>}
-                  {isAssistant && message.totalElapsedMs !== undefined && (
-                    <div className="message-meta">Completed in {formatTotalElapsedMs(message.totalElapsedMs)}</div>
-                  )}
                   {isAssistant && (message.thinkingSteps.length > 0 || toolRows.length > 0) && (
-                    <details className="trace-panel">
+                    <details className="trace-panel" open>
                       <summary className="trace-panel-summary">
                         <span className="trace-title">Agent Trace</span>
                         <span className="trace-counts">
@@ -268,37 +338,51 @@ export default function App() {
                         </span>
                       </summary>
                       <div className="trace-panel-body">
-                        {message.thinkingSteps.map((step, i) => (
-                          <div key={`${message.id}-step-${i}`} className="trace-line">
-                            <span className="trace-pill">plan</span>
-                            <span className="trace-line-text">{step.text}</span>
-                          </div>
-                        ))}
-                        {toolRows.map((ev, i) => (
-                          <details key={`${message.id}-tool-${i}`} className="tool-item">
+                        {traceTimeline.map((entry) => (
+                          entry.kind === "step" ? (
+                            <div key={`${message.id}-step-${entry.step.id}`} className="trace-line">
+                              <span className="trace-pill">{entry.step.kind}</span>
+                              <span className="trace-line-text">{entry.step.text}</span>
+                              {entry.step.durationText && <span className="trace-latency">{entry.step.durationText}</span>}
+                            </div>
+                          ) : (
+                          <details key={`${message.id}-tool-${entry.index}`} className="tool-item">
                             <summary className="tool-summary">
                               <div className="tool-header">
-                                <span className={`tool-source ${ev.toolKind}`}>{toolKindLabel(ev.toolKind)}</span>
-                                <span className="tool-name">{ev.toolName}</span>
+                                <span className={`tool-source ${entry.tool.toolKind}`}>{toolKindLabel(entry.tool.toolKind)}</span>
+                                <span className="tool-name">{entry.tool.toolName}</span>
                               </div>
-                              {ev.durationMs !== undefined && <span className="trace-latency">{ev.durationMs}ms</span>}
+                              {entry.tool.durationMs !== undefined && <span className="trace-latency">{entry.tool.durationMs}ms</span>}
                             </summary>
-                            {ev.callPayload && (
+                            {entry.tool.callPayload && (
                               <div className="tool-detail-section">
                                 <div className="tool-detail-label">Call</div>
-                                <pre>{JSON.stringify(ev.callPayload, null, 2)}</pre>
+                                <pre>{JSON.stringify(entry.tool.callPayload, null, 2)}</pre>
                               </div>
                             )}
-                            {ev.resultPayload && (
+                            {entry.tool.resultPayload && (
                               <div className="tool-detail-section">
                                 <div className="tool-detail-label">Result</div>
-                                <pre>{JSON.stringify(ev.resultPayload, null, 2)}</pre>
+                                <pre>{JSON.stringify(entry.tool.resultPayload, null, 2)}</pre>
                               </div>
                             )}
                           </details>
+                          )
                         ))}
                       </div>
                     </details>
+                  )}
+                  {message.content && (
+                    <div className="message-bubble">
+                      {message.role === "assistant" ? (
+                        <MarkdownMessage content={message.content} />
+                      ) : (
+                        <div className="plain-text-message">{message.content}</div>
+                      )}
+                    </div>
+                  )}
+                  {isAssistant && message.totalElapsedMs !== undefined && (
+                    <div className="message-meta">Completed in {formatTotalElapsedMs(message.totalElapsedMs)}</div>
                   )}
                 </article>
               );

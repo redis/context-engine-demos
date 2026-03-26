@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="")
     openai_chat_model: str = Field(default="gpt-4o")
     openai_embedding_model: str = Field(default="text-embedding-3-small")
+    openai_reasoning_effort: str = Field(default="medium")
+    openai_lightweight_model: str = Field(default="")
+    openai_lightweight_reasoning_effort: str = Field(default="low")
 
     redis_host: str = Field(default="localhost")
     redis_port: int = Field(default=6379)
@@ -39,6 +42,8 @@ class Settings(BaseSettings):
     backend_port: int = Field(default=8040)
     cors_origin: str = Field(default="http://localhost:3040")
     demo_domain: str = Field(default="reddash")
+    show_final_verifier_trace_step: bool = Field(default=False)
+    show_llm_trace_steps: bool = Field(default=False)
 
 
 def get_settings() -> Settings:

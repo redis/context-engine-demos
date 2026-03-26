@@ -1,0 +1,1 @@
+"""ElectroHub domain."""

@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ElectroHub Technical Walkthrough</title>
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@5/dist/reveal.css" />
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@5/dist/theme/black.css" />
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@5/plugin/highlight/monokai.css" />
+    <style>
+      :root {
+        --bg: #07101d;
+        --bg-2: #0b1627;
+        --panel: rgba(13, 24, 39, 0.9);
+        --panel-2: rgba(16, 31, 51, 0.94);
+        --line: rgba(95, 165, 255, 0.16);
+        --line-strong: rgba(95, 165, 255, 0.28);
+        --text: #f4f8ff;
+        --muted: #9cb1cc;
+        --soft: #d8e6fb;
+        --redis: #dc382d;
+        --redis-soft: rgba(220, 56, 45, 0.14);
+        --blue: #42b8ff;
+        --blue-soft: rgba(66, 184, 255, 0.14);
+        --green: #3fd4aa;
+        --yellow: #ffd166;
+      }
+
+      .reveal {
+        font-family: "Manrope", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(66, 184, 255, 0.14), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(220, 56, 45, 0.18), transparent 24%),
+          linear-gradient(180deg, var(--bg), var(--bg-2));
+      }
+
+      .reveal h1,
+      .reveal h2,
+      .reveal h3 {
+        text-transform: none;
+        letter-spacing: -0.03em;
+      }
+
+      .reveal h1 {
+        font-size: 2.35em;
+        margin: 0 0 0.18em;
+      }
+
+      .reveal h2 {
+        font-size: 1.55em;
+        margin: 0 0 0.3em;
+      }
+
+      .reveal h3 {
+        font-size: 0.82em;
+        margin: 0 0 0.45em;
+      }
+
+      .reveal p,
+      .reveal li {
+        font-size: 0.78em;
+        line-height: 1.45;
+        color: var(--soft);
+      }
+
+      .eyebrow {
+        color: var(--blue);
+        font-size: 0.45em;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 1em;
+      }
+
+      .hero,
+      .left {
+        text-align: left;
+      }
+
+      .hero-grid,
+      .two-col,
+      .three-col,
+      .logo-row {
+        display: grid;
+        gap: 24px;
+      }
+
+      .hero-grid {
+        grid-template-columns: 1.3fr 1fr;
+        align-items: center;
+      }
+
+      .two-col {
+        grid-template-columns: 1.1fr 0.9fr;
+        align-items: start;
+      }
+
+      .three-col {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .logo-row {
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .card {
+        background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 22px;
+        padding: 22px 24px;
+        text-align: left;
+        box-shadow: 0 18px 50px rgba(0,0,0,0.26);
+      }
+
+      .card.redis {
+        border-color: rgba(220,56,45,0.32);
+        background: linear-gradient(180deg, rgba(220,56,45,0.11), rgba(255,255,255,0.015));
+      }
+
+      .card.blue {
+        border-color: rgba(66,184,255,0.26);
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .pill {
+        border-radius: 999px;
+        padding: 7px 12px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.04);
+        color: var(--muted);
+        font-size: 0.36em;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .pill.redis { background: var(--redis-soft); color: #ffd5d2; border-color: rgba(220,56,45,0.38); }
+      .pill.blue { background: var(--blue-soft); color: #d8efff; border-color: rgba(66,184,255,0.34); }
+      .pill.green { background: rgba(63,212,170,0.12); color: #ddfff6; border-color: rgba(63,212,170,0.28); }
+
+      .brand-lockup {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .brand-lockup img.logo-square {
+        width: 88px;
+        height: 88px;
+        border-radius: 24px;
+        object-fit: cover;
+        box-shadow: 0 18px 36px rgba(0,0,0,0.24);
+      }
+
+      .brand-lockup img.redis-wordmark {
+        width: 210px;
+        height: auto;
+      }
+
+      .callout {
+        font-size: 0.82em;
+        line-height: 1.45;
+        color: var(--text);
+      }
+
+      .metric {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .metric strong {
+        font-size: 1.8em;
+        line-height: 1;
+        color: var(--text);
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 0.6em;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      .layer {
+        border-radius: 18px;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.025);
+      }
+
+      .layer strong {
+        color: var(--text);
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .flow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 0.56em;
+        color: var(--muted);
+      }
+
+      .flow .node {
+        padding: 10px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.03);
+      }
+
+      .flow .arrow {
+        color: var(--blue);
+        font-weight: 800;
+      }
+
+      .reveal pre {
+        width: 100%;
+        margin: 0.7em 0 0;
+        box-shadow: none;
+      }
+
+      .reveal pre code {
+        max-height: 430px;
+        padding: 18px;
+        border-radius: 18px;
+        background: #08111b;
+        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+        font-size: 0.45em;
+        line-height: 1.42;
+      }
+
+      .reveal :not(pre) > code {
+        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+        font-size: 0.82em;
+        color: #ffd9b8;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 0.12em 0.36em;
+      }
+
+      .demo-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        margin: 12px 0;
+      }
+
+      .num {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        background: rgba(66,184,255,0.14);
+        color: #d8efff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 0.48em;
+        flex: 0 0 auto;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 0.56em;
+      }
+
+      .quote {
+        font-size: 0.82em;
+        line-height: 1.5;
+        color: var(--text);
+      }
+
+      .reveal ul.flat {
+        list-style: none;
+        padding-left: 0;
+        margin-left: 0;
+      }
+
+      .reveal ul.flat li {
+        margin: 0.42em 0;
+      }
+
+      .reveal table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.55em;
+      }
+
+      .reveal th,
+      .reveal td {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        text-align: left;
+      }
+
+      .reveal th {
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section class="hero">
+          <div class="eyebrow">Redis Context Surfaces • ElectroHub</div>
+          <div class="hero-grid">
+            <div>
+              <div class="brand-lockup">
+                <img class="logo-square" src="assets/electrohub-simple.png" alt="ElectroHub logo" />
+                <img class="redis-wordmark" src="assets/redis-logo.png" alt="Redis logo" />
+              </div>
+              <h1>ElectroHub<br />Agentic Commerce Demo</h1>
+              <p class="quote">
+                How Redis Context Surfaces powers product search, store pickup,
+                shipment support, and live operational answers in one commerce app.
+              </p>
+              <div class="pill-row">
+                <span class="pill redis">Redis Context Surfaces</span>
+                <span class="pill blue">LangGraph ReAct</span>
+                <span class="pill green">ElectroHub</span>
+              </div>
+            </div>
+            <div class="card redis">
+              <h3>What this app proves</h3>
+              <ul class="flat">
+                <li>Structured commerce data can be turned into live agent tools.</li>
+                <li>The same assistant can answer shopping, pickup, and shipment questions.</li>
+                <li>Users can see traceable planning and tool usage instead of black-box output.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">App Goals</div>
+          <h2>What ElectroHub Needs To Do Well</h2>
+          <div class="two-col">
+            <div class="card blue">
+              <div class="demo-step">
+                <div class="num">1</div>
+                <div>
+                  <strong>Product guidance</strong>
+                  <div class="small">Recommend devices from a broad electronics catalog using real product metadata.</div>
+                </div>
+              </div>
+              <div class="demo-step">
+                <div class="num">2</div>
+                <div>
+                  <strong>Local pickup truth</strong>
+                  <div class="small">Verify store-specific stock before promising pickup timing.</div>
+                </div>
+              </div>
+              <div class="demo-step">
+                <div class="num">3</div>
+                <div>
+                  <strong>Order and shipment support</strong>
+                  <div class="small">Explain late deliveries using actual order, shipment, and event records.</div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Why the architecture matters</h3>
+              <ul class="flat">
+                <li>Document retrieval alone is not enough for inventory or shipment questions.</li>
+                <li>Hardcoded tool glue does not scale as the app adds more entities.</li>
+                <li>Context Surfaces gives the agent a structured operational interface over Redis.</li>
+                <li>That lets the model reason over live commerce state instead of only text snippets.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Architecture</div>
+          <h2>How The ElectroHub App Is Wired</h2>
+          <div class="card">
+            <div class="flow">
+              <span class="node">React UI</span>
+              <span class="arrow">→</span>
+              <span class="node">FastAPI SSE</span>
+              <span class="arrow">→</span>
+              <span class="node">LangGraph ReAct Agent</span>
+              <span class="arrow">→</span>
+              <span class="node">ElectroHub Internal Tools</span>
+              <span class="arrow">+</span>
+              <span class="node">Context Surfaces MCP Tools</span>
+              <span class="arrow">→</span>
+              <span class="node">Redis Data + Memory</span>
+            </div>
+          </div>
+          <div class="three-col" style="margin-top: 18px;">
+            <div class="card">
+              <h3>Frontend and API</h3>
+              <ul class="flat">
+                <li>FastAPI streaming API</li>
+                <li>LangGraph ReAct loop</li>
+                <li>Trace-first UI</li>
+                <li>Markdown answer rendering</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Commerce logic</h3>
+              <ul class="flat">
+                <li>Customer context</li>
+                <li>Product and inventory lookup</li>
+                <li>Order and shipment handling</li>
+                <li>Buying-guide retrieval</li>
+              </ul>
+            </div>
+            <div class="card redis">
+              <h3>Redis / Context Surfaces</h3>
+              <ul class="flat">
+                <li>Live structured entities</li>
+                <li>MCP tool generation</li>
+                <li>Single operational data plane</li>
+                <li>RAG + tools on the same platform</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Context Surfaces Model</div>
+          <h2>ElectroHub Ships A Real Context Surfaces Data Model</h2>
+          <div class="two-col">
+            <div class="card">
+              <pre><code class="language-python">from context_surfaces.context_model import (
+    ContextField,
+    ContextModel,
+)
+
+
+class Product(ContextModel):
+    __redis_key_template__ = "electrohub_product:{product_id}"
+
+    product_id: str = ContextField(
+        description="Unique product identifier",
+        is_key_component=True,
+    )
+    sku: str = ContextField(
+        description="Retail SKU used in checkout and store systems",
+        index="tag",
+        no_stem=True,
+    )
+    name: str = ContextField(
+        description="Customer-facing product name",
+        index="text",
+        weight=2.2,
+    )
+    category: str = ContextField(
+        description="Top-level category such as Computers or Audio",
+        index="tag",
+    )
+    form_factor: str = ContextField(
+        description="Device shape such as laptop, desktop, or mini_pc",
+        index="tag",
+    )
+    price: float = ContextField(
+        description="Current selling price",
+        index="numeric",
+        sortable=True,
+    )
+    specs_summary: str = ContextField(
+        description="Readable hardware summary for the product",
+        index="text",
+    )
+    search_text: str = ContextField(
+        description="Expanded searchable text for product discovery",
+        index="text",
+        weight=1.8,
+    )</code></pre>
+            </div>
+            <div class="card blue">
+              <h3>Why this matters</h3>
+              <ul class="flat">
+                <li>This is the Context Surfaces model the ElectroHub app actually registers.</li>
+                <li>Products, orders, shipments, support cases, and inventory each have explicit indexed fields.</li>
+                <li>Context Surfaces can turn that model into practical tools like <code>search_product_by_text</code> and <code>filter_storeinventory_by_product_id</code>.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Surface Lifecycle</div>
+          <h2>ElectroHub Creates The Surface Directly From The Model</h2>
+          <div class="two-col">
+            <div class="card">
+              <pre><code class="language-python">body = {
+    "name": surface_name,
+    "description": description,
+    "data_model": data_model,
+    "data_source": {
+        "type": "redis",
+        "connection_config": {
+            "addr": redis_addr,
+            "username": redis_username,
+            "password": redis_password,
+            "db": redis_db,
+            "tls_enabled": redis_ssl,
+        },
+    },
+}
+
+client.post("/api/v1/context-surfaces", json=body)</code></pre>
+            </div>
+            <div class="card">
+              <h3>The same flow can come from <code>ctxctl</code></h3>
+              <pre><code class="language-bash">ctxctl context-surface create \
+  --name "ElectroHub Commerce Surface" \
+  --data-model domains/electrohub/generated_models.py \
+  --redis-addr "$REDIS_HOST:$REDIS_PORT" \
+  --redis-username "$REDIS_USERNAME" \
+  --redis-password "$REDIS_PASSWORD" \
+  --redis-db "$REDIS_DB"</code></pre>
+              <h3>What gets registered</h3>
+              <ul class="flat">
+                <li>The ElectroHub data model</li>
+                <li>The Redis connection configuration</li>
+                <li>A named surface and agent key for MCP access</li>
+              </ul>
+              <p class="small">
+                In this repo we automate surface creation in code, but the same operational setup can be shown directly with <code>ctxctl</code> during a technical walkthrough.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Tool Discovery</div>
+          <h2>The App Discovers And Calls Context Surfaces Tools At Runtime</h2>
+          <div class="two-col">
+            <div class="card blue">
+              <pre><code class="language-python">async def list_tools(self) -> list[dict[str, Any]]:
+    async with UnifiedClient() as client:
+        tools = await client.list_tools(self.settings.mcp_agent_key)
+    return [t if isinstance(t, dict) else t.model_dump() for t in tools]
+
+
+async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    async with UnifiedClient() as client:
+        result = await client.query_tool(
+            agent_key=self.settings.mcp_agent_key,
+            tool_name=tool_name,
+            arguments=arguments,
+        )</code></pre>
+            </div>
+            <div class="card">
+              <h3>ElectroHub examples</h3>
+              <ul class="flat">
+                <li><code>search_product_by_text</code> for product discovery</li>
+                <li><code>filter_storeinventory_by_product_id</code> for pickup truth</li>
+                <li><code>filter_order_by_customer_id</code> for order history</li>
+                <li><code>filter_shipment_by_order_id</code> and shipment events for late-delivery answers</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Agent Execution</div>
+          <h2>LangGraph Uses Those Tools To Answer Multi-Step Commerce Questions</h2>
+          <div class="two-col">
+            <div class="card blue">
+              <pre><code class="language-python">async def create_agent(settings, internal_tools, cs_service, checkpointer=None):
+    model = ChatOpenAI(...)
+
+    tools = _make_internal_tools(internal_tools)
+    mcp_defs = await cs_service.list_tools()
+    tools.extend(_make_mcp_tool(t, cs_service) for t in mcp_defs)
+
+    return create_react_agent(
+        model,
+        tools,
+        prompt=prompt,
+        checkpointer=checkpointer,
+    )</code></pre>
+            </div>
+            <div class="card">
+              <h3>Why this works for ElectroHub</h3>
+              <ul class="flat">
+                <li>The model can plan, call product and inventory tools, inspect the results, and keep going.</li>
+                <li>That fits retail questions because one answer often spans multiple entities and data sources.</li>
+                <li>Examples: product + inventory, or order + shipment + shipment events.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Context Surfaces</div>
+          <h2>Where Redis Context Surfaces Changes The Game</h2>
+          <div class="three-col">
+            <div class="card redis">
+              <h3>Without it</h3>
+              <ul class="flat">
+                <li>Handwritten adapters for every entity.</li>
+                <li>Prompt drift around tool names and query semantics.</li>
+                <li>More surface area to maintain for every new demo.</li>
+              </ul>
+            </div>
+            <div class="card blue">
+              <h3>With it</h3>
+              <ul class="flat">
+                <li>Structured Redis models become MCP tools.</li>
+                <li>The LLM sees <code>filter_*</code> and <code>search_*</code> tools automatically.</li>
+                <li>Same operational data plane supports agentic reasoning and retrieval.</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>What improves</h3>
+              <ul class="flat">
+                <li>Less custom glue.</li>
+                <li>Clearer operational answers.</li>
+                <li>Better separation between retrieval and live state.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="card" style="margin-top: 18px;">
+            <p class="callout">
+              In ElectroHub, the same agent can reason over products, store inventory, shipments, and support cases
+              because Context Surfaces exposes all of those entities consistently as MCP tools.
+            </p>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Demo Walkthrough</div>
+          <h2>ElectroHub Request Path</h2>
+          <div class="two-col">
+            <div class="card">
+              <p class="quote">
+                “I am looking for a MacMini to run OpenClaw on, what machines do you have in stock that would help?”
+              </p>
+              <div class="demo-step">
+                <div class="num">1</div>
+                <div>
+                  <strong>ReAct plans</strong>
+                  <div class="small">Decides whether it needs tools and which domain context matters.</div>
+                </div>
+              </div>
+              <div class="demo-step">
+                <div class="num">2</div>
+                <div>
+                  <strong>Context lookup</strong>
+                  <div class="small">Fetches the signed-in customer and local store context.</div>
+                </div>
+              </div>
+              <div class="demo-step">
+                <div class="num">3</div>
+                <div>
+                  <strong>Catalog + inventory</strong>
+                  <div class="small">Queries products, then verifies real store inventory before claiming pickup.</div>
+                </div>
+              </div>
+            </div>
+            <div class="card blue">
+              <h3>Trace value</h3>
+              <ul class="flat">
+                <li>Users see plan and tool steps inline.</li>
+                <li>Engineering teams can separate LLM time from tool time.</li>
+                <li>The app becomes easier to debug when an answer is slow or weakly grounded.</li>
+              </ul>
+              <img src="assets/electrohub-big.png" alt="ElectroHub graphic" style="width: 100%; max-width: 260px; display: block; margin: 18px auto 0;" />
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">RAG Vs Agentic</div>
+          <h2>We Intentionally Keep Both Paths</h2>
+          <div class="card">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mode</th>
+                  <th>Good at</th>
+                  <th>Weak at</th>
+                  <th>ElectroHub example</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Simple RAG</td>
+                  <td>Policies, buying guides, FAQ-style responses</td>
+                  <td>Live state, inventory, shipment scans</td>
+                  <td>“What is your pickup policy?”</td>
+                </tr>
+                <tr>
+                  <td>Agentic via Context Surfaces</td>
+                  <td>Operational answers across multiple live entities</td>
+                  <td>More latency, more orchestration</td>
+                  <td>“Can I pick that up at my local store?”</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pill-row">
+            <span class="pill blue">RAG is still generic</span>
+            <span class="pill redis">Tools handle live truth</span>
+            <span class="pill green">One app shows both patterns</span>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Why Redis</div>
+          <h2>One Platform, Multiple Agent Needs</h2>
+          <div class="three-col">
+            <div class="card">
+              <div class="metric">
+                <strong>Structured entities</strong>
+                <span>Orders, products, shipment events, policies, store inventory</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="metric">
+                <strong>Vector retrieval</strong>
+                <span>Guides and policies for the Simple RAG path</span>
+              </div>
+            </div>
+            <div class="card redis">
+              <div class="metric">
+                <strong>Checkpoint memory</strong>
+                <span>Conversation state stored in Redis for the LangGraph agent</span>
+              </div>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="layer"><strong>Operational truth</strong> Redis JSON / indexed entities surfaced as MCP tools</div>
+            <div class="layer"><strong>Knowledge retrieval</strong> Vector search over policy and guide content</div>
+            <div class="layer"><strong>Agent memory</strong> Redis-backed LangGraph checkpointing across turns</div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Conversation State</div>
+          <h2>ElectroHub Uses <code>langgraph-checkpoint-redis</code></h2>
+          <div class="two-col">
+            <div class="card blue">
+              <pre><code class="language-python">from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+
+
+checkpointer = AsyncRedisSaver(
+    redis_url=redis_url,
+    checkpoint_prefix=domain.manifest.namespace.checkpoint_prefix,
+    checkpoint_write_prefix=domain.manifest.namespace.checkpoint_write_prefix,
+)
+await checkpointer.asetup()
+
+agent = create_react_agent(
+    model,
+    tools,
+    prompt=prompt,
+    checkpointer=checkpointer,
+)</code></pre>
+            </div>
+            <div class="card">
+              <h3>Why it helps</h3>
+              <ul class="flat">
+                <li><code>AsyncRedisSaver</code> persists LangGraph thread state in Redis.</li>
+                <li>Conversation state lives on the backend, not only in the browser.</li>
+                <li>Follow-up questions can reuse prior context and tool history by thread.</li>
+                <li>It makes demos easier to debug because state is durable and inspectable.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Operational Posture</div>
+          <h2>How The ElectroHub Demo Is Designed To Be Used</h2>
+          <div class="two-col">
+            <div class="card blue">
+              <h3>For live demos</h3>
+              <ul class="flat">
+                <li>Bring up Redis, surface, and app locally with a short setup flow.</li>
+                <li>Use the same UI to show both Simple RAG and agentic Context Surfaces behavior.</li>
+                <li>Keep the agent trace open so technical viewers can see planning and tool calls.</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>In the walkthrough</h3>
+              <ul class="flat">
+                <li>Inspect which answers came from policies versus live operational data.</li>
+                <li>Measure where latency comes from: LLM planning versus tool execution.</li>
+                <li>Validate that pickup and shipment claims are grounded in current Redis records.</li>
+              </ul>
+            </div>
+          </div>
+          <p class="small">
+            The app is intentionally built to support a technical walkthrough, not just a glossy chat demo.
+          </p>
+        </section>
+
+        <section class="hero">
+          <div class="eyebrow">Takeaways</div>
+          <div class="hero-grid">
+            <div>
+              <h1>Key takeaways</h1>
+              <div class="pill-row">
+                <span class="pill redis">Redis is the data plane</span>
+                <span class="pill blue">Context Surfaces is the structured tool plane</span>
+                <span class="pill green">ElectroHub is the app experience</span>
+              </div>
+            </div>
+            <div class="card redis">
+              <ul class="flat">
+                <li>This is not just semantic search over docs.</li>
+                <li>It is an agent operating over live commerce entities with visible reasoning and tool use.</li>
+                <li>Redis Context Surfaces is what makes that operational interface clean.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/reveal.js@5/dist/reveal.js"></script>
+    <script src="https://unpkg.com/reveal.js@5/plugin/highlight/highlight.js"></script>
+    <script>
+      Reveal.initialize({
+        hash: true,
+        controls: true,
+        progress: true,
+        transition: "fade",
+        slideNumber: true,
+        width: 1440,
+        height: 900,
+        margin: 0.06,
+        plugins: [RevealHighlight],
+      });
+    </script>
+  </body>
+</html>

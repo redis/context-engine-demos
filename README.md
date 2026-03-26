@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🍕 Reddash
+# Context Surfaces Demos
 
-**Food-delivery support intelligence powered by Redis Context Surfaces**
+**Reusable demo apps powered by Redis Context Surfaces**
 
-Ask about order status, late deliveries, refund policies, and more —
+Domain-specific demo apps for agentic workflows over structured Redis data,
 with full tool-call visibility in a dark-mode chat UI.
 
 [Getting Started](#getting-started) · [Architecture](#architecture) · [Demo Paths](#demo-paths)
@@ -15,9 +15,12 @@ with full tool-call visibility in a dark-mode chat UI.
 
 ## What is this?
 
-Reddash is now the first built-in **domain pack** in a reusable multi-domain demo framework. The shared runtime shows how **Redis Context Surfaces** turns your Redis data into auto-generated [MCP](https://modelcontextprotocol.io/) tools that any AI agent can call. Instead of stuffing documents into a vector store and hoping the LLM figures it out, Context Surfaces gives agents **structured, scoped, real-time access** to your operational data.
+Context Surfaces Demos is a multi-domain demo framework built around **Redis Context Surfaces**. The shared runtime shows how Context Surfaces turns Redis data into auto-generated [MCP](https://modelcontextprotocol.io/) tools that an AI agent can call. Instead of stuffing documents into a vector store and hoping the LLM figures it out, Context Surfaces gives agents **structured, scoped, real-time access** to operational data.
 
-The active built-in domain is a food-delivery support agent that can chain 7+ tool calls across customers, orders, drivers, delivery events, payments, and policies — all backed by Redis Cloud.
+The repo currently includes built-in demo domains for:
+
+- `reddash` — food-delivery support
+- `electrohub` — electronics retail and order support
 
 **Two modes, same UI:**
 
@@ -52,8 +55,8 @@ You will also need:
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/<your-org>/reddash.git
-cd reddash
+git clone https://github.com/<your-org>/context-surfaces-demos.git
+cd context-surfaces-demos
 cp .env.example .env
 ```
 
@@ -91,9 +94,7 @@ make generate-data DOMAIN=reddash
 make setup-surface
 ```
 
-This registers your Redis instance, creates a Context Surface with the active domain's generated models, generates an agent key, and writes `CTX_SURFACE_ID`, `CTX_REDIS_INSTANCE_ID`, and `MCP_AGENT_KEY` back into `.env`.
-
-> Already have a Redis instance registered? Set `CTX_REDIS_INSTANCE_ID` in `.env` first to reuse it.
+This creates a Context Surface with the active domain's generated models, embeds the current Redis connection settings as the surface data source, generates an agent key, and writes `CTX_SURFACE_ID` and `MCP_AGENT_KEY` back into `.env`.
 
 ### 5. Load data
 
@@ -116,9 +117,12 @@ make dev
 
 Open http://localhost:3040 and try:
 
-- *"Why is my order running late?"*
-- *"How much was I charged for my last order?"*
-- *"What's your refund policy for late deliveries?"*
+- In `reddash`:
+  - *"Why is my order running late?"*
+  - *"How much was I charged for my last order?"*
+- In `electrohub`:
+  - *"Show me my recent ElectroHub orders."*
+  - *"Can I pick that up at my local store?"*
 
 ---
 
@@ -145,9 +149,9 @@ Open http://localhost:3040 and try:
 
 ---
 
-## Data Model
+## Example Data Model
 
-Nine entity types model a food-delivery platform:
+The `reddash` domain models a food-delivery platform with nine entity types:
 
 | Entity | Key Pattern | Key Indexed Fields |
 |--------|-------------|-------------------|
@@ -161,13 +165,18 @@ Nine entity types model a food-delivery platform:
 | **SupportTicket** | `reddash_support_ticket:{id}` | customer_id, order_id, category, status |
 | **Policy** | `reddash_policy:{id}` | title, category, content, content_embedding (vector) |
 
-Reddash schema definitions live in [`domains/reddash/schema.py`](domains/reddash/schema.py). A backward-compatible re-export still exists at `schemas/reddash_schema.py`.
+Reddash schema definitions live in [`domains/reddash/schema.py`](domains/reddash/schema.py). ElectroHub schema definitions live in [`domains/electrohub/schema.py`](domains/electrohub/schema.py).
 
 ---
 
 ## Demo Paths
 
-See [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md) for four scripted conversation flows:
+See:
+
+- [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md)
+- [`domains/electrohub/docs/demo_paths.md`](domains/electrohub/docs/demo_paths.md)
+
+Reddash includes four scripted conversation flows:
 
 1. **Late Order Investigation** ⭐ — 7-tool chain across orders, drivers, delivery events, and policies
 2. **Payment & Membership** — itemized charges, membership tier awareness
@@ -175,6 +184,17 @@ See [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md) f
 4. **Multi-Entity Awareness** — cross-entity aggregation (restaurants, spend, promo codes)
 
 > **Tip:** After each path, toggle to Simple RAG mode and ask the same question to see the contrast.
+
+## Presentations
+
+Keep domain-specific presentations with the domain itself:
+
+- `domains/<domain-id>/presentations/`
+
+Example:
+
+- [`domains/electrohub/presentations/director-demo/index.html`](domains/electrohub/presentations/director-demo/index.html)
+- [`domains/electrohub/presentations/director-demo/README.md`](domains/electrohub/presentations/director-demo/README.md)
 
 ---
 
@@ -186,7 +206,7 @@ See [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md) f
 | `make validate-domain DOMAIN=reddash` | Validate the chosen domain pack |
 | `make generate-models DOMAIN=reddash` | Regenerate ContextModel classes for the chosen domain |
 | `make generate-data DOMAIN=reddash` | Generate sample JSONL data in `output/<domain>` |
-| `make setup-surface DOMAIN=reddash` | Register Redis, create surface + agent key via ctxctl |
+| `make setup-surface DOMAIN=reddash` | Create surface + agent key using embedded Redis connection settings |
 | `make load-data DOMAIN=reddash` | Import JSONL data via Context Surfaces API |
 | `make smoke-domain DOMAIN=reddash` | Run a lightweight scaffold/data/model smoke test |
 | `make create-domain DOMAIN=electronics-store` | Scaffold a new domain pack |
@@ -201,7 +221,7 @@ See [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md) f
 ## Project Structure
 
 ```
-reddash/
+context-surfaces-demos/
 ├── backend/app/             # Shared FastAPI + LangGraph runtime
 │   ├── core/                # Domain contract, schema types, loader
 │   ├── main.py              # App entry, SSE endpoints, /api/domain-config
@@ -210,14 +230,16 @@ reddash/
 │   ├── rag_service.py       # Shared simple-RAG comparison mode
 │   └── settings.py          # Pydantic settings (.env loader)
 ├── domains/
-│   └── reddash/             # First built-in domain pack
+│   ├── reddash/             # Delivery-support reference domain
+│   └── electrohub/          # Electronics retail reference domain
 │       ├── domain.py        # DOMAIN export implementing the contract
 │       ├── schema.py        # Entity definitions
 │       ├── prompt.py        # Domain prompt/playbooks
 │       ├── data_generator.py
 │       ├── generated_models.py
-│       ├── assets/logo.svg
+│       ├── assets/logo.(svg|png|jpg|webp)
 │       └── docs/demo_paths.md
+│       └── presentations/   # Domain-specific decks and assets
 ├── frontend/src/            # React + Vite chat UI
 │   ├── App.tsx              # Shared chat UI shell
 │   └── styles.css           # Theme-driven styles
@@ -239,6 +261,10 @@ make validate-domain DOMAIN=electronics-store
 
 Then fill in `domains/electronics-store/` and follow the repo-local skill at
 [`./.codex/skills/domain-pack-authoring/SKILL.md`](.codex/skills/domain-pack-authoring/SKILL.md).
+Domain logos can be `svg`, `png`, `jpg`, `jpeg`, or `webp` as long as
+`branding.logo_path` matches the asset under `domains/<domain>/assets/`.
+If the domain has presentation material, keep it under
+`domains/<domain-id>/presentations/`.
 
 ---
 

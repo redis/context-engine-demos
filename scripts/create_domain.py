@@ -48,8 +48,8 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = ()
 from typing import Any, Sequence
 
 
-def build_system_prompt(*, mcp_tools: Sequence[dict[str, Any]]) -> str:
-    del mcp_tools
+def build_system_prompt(*, mcp_tools: Sequence[dict[str, Any]], runtime_config: dict[str, Any] | None = None) -> str:
+    del mcp_tools, runtime_config
     return "You are a domain assistant."
 """)
     write(domain_dir / "data_generator.py", f"""from __future__ import annotations
@@ -145,10 +145,38 @@ class {title.replace(" ", "")}Domain:
     def get_entity_specs(self) -> tuple[EntitySpec, ...]:
         return ENTITY_SPECS
 
-    def build_system_prompt(self, *, mcp_tools: Sequence[dict[str, Any]]) -> str:
-        return build_system_prompt(mcp_tools=mcp_tools)
+    def get_runtime_config(self, *, settings: Any) -> dict[str, Any]:
+        del settings
+        return {{}}
 
-    def get_internal_tool_definitions(self) -> Sequence[InternalToolDefinition]:
+    def build_system_prompt(
+        self,
+        *,
+        mcp_tools: Sequence[dict[str, Any]],
+        runtime_config: dict[str, Any] | None = None,
+    ) -> str:
+        return build_system_prompt(mcp_tools=mcp_tools, runtime_config=runtime_config)
+
+    def build_answer_verifier_prompt(self, *, runtime_config: dict[str, Any] | None = None) -> str:
+        del runtime_config
+        return ""
+
+    def describe_tool_trace_step(
+        self,
+        *,
+        tool_name: str,
+        payload: Any,
+        runtime_config: dict[str, Any] | None = None,
+    ) -> str | None:
+        del tool_name, payload, runtime_config
+        return None
+
+    def get_internal_tool_definitions(
+        self,
+        *,
+        runtime_config: dict[str, Any] | None = None,
+    ) -> Sequence[InternalToolDefinition]:
+        del runtime_config
         return ()
 
     def execute_internal_tool(self, tool_name: str, arguments: dict[str, Any], settings: Any) -> dict[str, Any]:
@@ -194,9 +222,11 @@ def test_{domain_id.replace('-', '_')}_domain_loads() -> None:
     print(f"Created domain scaffold at {domain_dir}")
     print("Next steps:")
     print(f"  1. Fill in domains/{domain_id}/schema.py")
-    print(f"  2. Customize domains/{domain_id}/domain.py")
-    print(f"  3. Run: uv run python scripts/validate_domain.py --domain {domain_id}")
-    print(f"  4. Run: uv run python scripts/generate_models.py --domain {domain_id}")
+    print(f"  2. Replace assets/logo.svg if you want a PNG/JPG/WebP logo and update logo_path in domains/{domain_id}/domain.py")
+    print(f"  3. Customize domains/{domain_id}/domain.py, prompt.py, data_generator.py, and docs/demo_paths.md")
+    print(f"  4. Run: uv run python scripts/validate_domain.py --domain {domain_id}")
+    print(f"  5. Run: uv run python scripts/generate_models.py --domain {domain_id}")
+    print(f"  6. Run: uv run python scripts/smoke_domain.py --domain {domain_id}")
 
 
 if __name__ == "__main__":
