@@ -1,17 +1,17 @@
-"""Generate ContextModel classes from the Reddish EntitySpec definitions."""
+"""Generate ContextModel classes for a domain pack."""
 
 from __future__ import annotations
 
-import sys
+import argparse
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from schemas.reddash_schema import ENTITY_SPECS, FieldSpec  # noqa: E402
-
-OUTPUT_PATH = ROOT / "backend/app/context_surfaces/reddash_models.py"
+from backend.app.core.domain_loader import load_domain
+from backend.app.core.domain_schema import FieldSpec
 
 
 def render_field(field: FieldSpec) -> str:
@@ -39,9 +39,10 @@ def render_field(field: FieldSpec) -> str:
     return "\n".join(lines)
 
 
-def render() -> str:
+def render(domain_id: str) -> str:
+    domain = load_domain(domain_id)
     chunks = [
-        '"""Generated Reddish data models for the food-delivery demo."""',
+        f'"""Generated Context Surface models for the {domain.manifest.branding.app_name} domain."""',
         "",
         "from __future__ import annotations",
         "",
@@ -52,9 +53,9 @@ def render() -> str:
         "",
     ]
 
-    for entity in ENTITY_SPECS:
+    for entity in domain.get_entity_specs():
         chunks.append(f"class {entity.class_name}(ContextModel):")
-        chunks.append(f'    """{entity.class_name} entity for the Reddish delivery demo."""')
+        chunks.append(f'    """{entity.class_name} entity for the {domain.manifest.branding.app_name} domain."""')
         chunks.append("")
         chunks.append(f'    __redis_key_template__ = "{entity.redis_key_template}"')
         chunks.append("")
@@ -77,11 +78,16 @@ def render() -> str:
 
 
 def main() -> None:
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(render())
-    print(f"Generated {OUTPUT_PATH}")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--domain", default="reddash")
+    args = parser.parse_args()
+
+    domain = load_domain(args.domain)
+    output_path = ROOT / domain.manifest.generated_models_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(render(args.domain))
+    print(f"Generated {output_path}")
 
 
 if __name__ == "__main__":
     main()
-

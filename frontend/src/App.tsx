@@ -34,6 +34,7 @@ type ChatMessage = {
 
 type HealthState = {
   ok: boolean;
+  domain: string;
   mcp_enabled: boolean;
   internal_tools: string[];
 } | null;
@@ -42,14 +43,18 @@ type AgentMode = "context_surfaces" | "simple_rag";
 
 type PromptCard = { eyebrow: string; title: string; prompt: string };
 
-const modeStorageKey = "reddish-mode";
+type DomainConfig = {
+  id: string;
+  app_name: string;
+  subtitle: string;
+  hero_title: string;
+  placeholder_text: string;
+  starter_prompts: PromptCard[];
+  theme: Record<string, string>;
+  logo_svg: string;
+} | null;
 
-const starterPrompts: PromptCard[] = [
-  { eyebrow: "Order Status", title: "Why is my order running late?", prompt: "Why is my order running late?" },
-  { eyebrow: "Order History", title: "Show me my recent orders", prompt: "Show me my order history" },
-  { eyebrow: "Policy", title: "What's your refund policy for late deliveries?", prompt: "What is your refund policy for late deliveries?" },
-  { eyebrow: "Search", title: "Find me a good sushi restaurant", prompt: "Can you find me a good sushi restaurant?" },
-];
+const modeStorageKey = "demo-domain-mode";
 
 function toolKindLabel(kind: ToolEvent["toolKind"]) {
   return kind === "mcp_tool" ? "Context Surface" : "Internal";
@@ -80,17 +85,22 @@ function mergeToolEvents(events: ToolEvent[]): MergedToolEvent[] {
   return merged;
 }
 
-function ReddishLogo({ className = "brand-logo" }: { className?: string }) {
+function BrandLogo({ svg, className = "brand-logo" }: { svg?: string; className?: string }) {
+  if (!svg) {
+    return <div className={className} />;
+  }
   return (
-    <svg className={className} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="12" fill="#FF4438" />
-      <path d="M12 28V14l8 7 8-7v14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <span
+      className={className}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 }
 
 export default function App() {
   const [health, setHealth] = useState<HealthState>(null);
+  const [domain, setDomain] = useState<DomainConfig>(null);
   const [mode, setMode] = useState<AgentMode>(() => (localStorage.getItem(modeStorageKey) as AgentMode) || "context_surfaces");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -103,12 +113,26 @@ export default function App() {
     void fetch("/api/health")
       .then((r) => r.json())
       .then((p: HealthState) => setHealth(p))
-      .catch(() => setHealth({ ok: false, mcp_enabled: false, internal_tools: [] }));
+      .catch(() => setHealth({ ok: false, domain: "unknown", mcp_enabled: false, internal_tools: [] }));
+  }, []);
+
+  useEffect(() => {
+    void fetch("/api/domain-config")
+      .then((r) => r.json())
+      .then((p: DomainConfig) => setDomain(p))
+      .catch(() => setDomain(null));
   }, []);
 
   useEffect(() => { localStorage.setItem(modeStorageKey, mode); }, [mode]);
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (!domain) return;
+    Object.entries(domain.theme).forEach(([key, value]) => {
+      document.documentElement.style.setProperty(`--${key.replaceAll("_", "-")}`, value);
+    });
+  }, [domain]);
 
   async function submitPrompt(prompt: string, event?: FormEvent) {
     event?.preventDefault();
@@ -198,10 +222,10 @@ export default function App() {
         <header className="topbar">
           <div className="topbar-left">
             <div className="brand">
-              <ReddishLogo className="brand-logo" />
+              <BrandLogo svg={domain?.logo_svg} className="brand-logo" />
               <div className="brand-copy">
-                <div className="brand-name">Reddish</div>
-                <div className="brand-subtitle">Delivery Support</div>
+                <div className="brand-name">{domain?.app_name ?? "Demo"}</div>
+                <div className="brand-subtitle">{domain?.subtitle ?? "Context Surfaces"}</div>
               </div>
             </div>
           </div>
@@ -215,8 +239,8 @@ export default function App() {
           <div className={`conversation ${hasMessages ? "has-messages" : "is-empty"}`}>
             {!hasMessages && (
               <div className="hero-panel">
-                <div className="hero-mark"><ReddishLogo className="hero-logo" /></div>
-                <h1 className="hero-title">How can we help?</h1>
+                <div className="hero-mark"><BrandLogo svg={domain?.logo_svg} className="hero-logo" /></div>
+                <h1 className="hero-title">{domain?.hero_title ?? "How can we help?"}</h1>
               </div>
             )}
 
@@ -283,7 +307,12 @@ export default function App() {
           </div>
 
           <form className={`composer ${hasMessages ? "thread" : "hero"}`} onSubmit={handleSubmit}>
-            <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleComposerKeyDown} placeholder="Ask about your order, delivery status, or policies..." />
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleComposerKeyDown}
+              placeholder={domain?.placeholder_text ?? "Ask a question..."}
+            />
             <div className="composer-footer">
               <div className="composer-hint">Press Enter to send</div>
               <button className="send-button" type="submit" disabled={isLoading}>Send</button>
@@ -294,7 +323,7 @@ export default function App() {
             <div className="quick-starts">
               <div className="quick-starts-label">Try asking</div>
               <div className="quick-starts-row">
-                {starterPrompts.map((p) => (
+                {(domain?.starter_prompts ?? []).map((p) => (
                   <button key={p.title} className="quick-start-chip" onClick={() => handleQuickStart(p.prompt)} type="button">{p.title}</button>
                 ))}
               </div>
@@ -305,4 +334,3 @@ export default function App() {
     </div>
   );
 }
-

@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Protocol, Sequence
+
+from pydantic import BaseModel, Field
+
+from backend.app.core.domain_schema import EntitySpec
+
+
+class PromptCard(BaseModel):
+    eyebrow: str
+    title: str
+    prompt: str
+
+
+class ThemeConfig(BaseModel):
+    bg: str
+    bg_accent_a: str
+    bg_accent_b: str
+    panel: str
+    panel_strong: str
+    panel_elevated: str
+    line: str
+    line_strong: str
+    text: str
+    muted: str
+    soft: str
+    accent: str
+    user: str
+
+
+class BrandingConfig(BaseModel):
+    app_name: str
+    subtitle: str
+    hero_title: str
+    placeholder_text: str
+    logo_path: str
+    starter_prompts: list[PromptCard]
+    theme: ThemeConfig
+
+
+class NamespaceConfig(BaseModel):
+    redis_prefix: str
+    dataset_meta_key: str
+    checkpoint_prefix: str
+    checkpoint_write_prefix: str
+    redis_instance_name: str
+    surface_name: str
+    agent_name: str
+
+
+class RagConfig(BaseModel):
+    tool_name: str
+    status_text: str
+    generating_text: str
+    index_name_contains: str
+    vector_field: str
+    return_fields: list[str]
+    num_results: int = 3
+    answer_system_prompt: str
+
+
+class IdentityConfig(BaseModel):
+    tool_name: str = "get_current_user_profile"
+    id_env_var: str = "DEMO_USER_ID"
+    name_env_var: str = "DEMO_USER_NAME"
+    email_env_var: str = "DEMO_USER_EMAIL"
+    id_field: str = "user_id"
+    default_id: str
+    default_name: str
+    default_email: str
+    description: str
+
+
+class DomainManifest(BaseModel):
+    id: str
+    version: str = "1"
+    description: str
+    generated_models_module: str
+    generated_models_path: str
+    output_dir: str
+    branding: BrandingConfig
+    namespace: NamespaceConfig
+    rag: RagConfig
+    identity: IdentityConfig
+
+
+class InternalToolDefinition(BaseModel):
+    name: str
+    description: str
+    input_schema: dict[str, Any] = Field(default_factory=lambda: {"type": "object", "properties": {}, "required": []})
+
+
+class GeneratedDataset(BaseModel):
+    output_dir: str
+    env_updates: dict[str, str]
+    summary: dict[str, int]
+
+
+class DomainPack(Protocol):
+    manifest: DomainManifest
+
+    def get_entity_specs(self) -> tuple[EntitySpec, ...]:
+        ...
+
+    def build_system_prompt(self, *, mcp_tools: Sequence[dict[str, Any]]) -> str:
+        ...
+
+    def get_internal_tool_definitions(self) -> Sequence[InternalToolDefinition]:
+        ...
+
+    def execute_internal_tool(self, tool_name: str, arguments: dict[str, Any], settings: Any) -> dict[str, Any]:
+        ...
+
+    def write_dataset_meta(self, *, settings: Any, records: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+        ...
+
+    def generate_demo_data(
+        self,
+        *,
+        output_dir: Path,
+        seed: int | None = None,
+        update_env_file: bool = True,
+    ) -> GeneratedDataset:
+        ...
+
+    def validate(self) -> list[str]:
+        ...

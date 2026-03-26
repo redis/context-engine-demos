@@ -1,6 +1,8 @@
 :root {
   color-scheme: dark;
   --bg: #0d0f14;
+  --bg-accent-a: rgba(255, 68, 56, 0.12);
+  --bg-accent-b: rgba(255, 140, 66, 0.1);
   --panel: rgba(20, 23, 32, 0.88);
   --panel-strong: rgba(24, 28, 40, 0.96);
   --panel-elevated: rgba(30, 35, 50, 0.92);
@@ -20,9 +22,9 @@ html, body, #root { min-height: 100%; }
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top center, rgba(255, 68, 56, 0.12), transparent 24rem),
-    radial-gradient(circle at 78% 18%, rgba(255, 140, 66, 0.1), transparent 28rem),
-    linear-gradient(180deg, #0d0f14 0%, #0a0c10 100%);
+    radial-gradient(circle at top center, var(--bg-accent-a), transparent 24rem),
+    radial-gradient(circle at 78% 18%, var(--bg-accent-b), transparent 28rem),
+    linear-gradient(180deg, var(--bg) 0%, #0a0c10 100%);
   color: var(--text);
   font-family: "Manrope", sans-serif;
 }
@@ -39,7 +41,8 @@ button { cursor: pointer; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
 .topbar-left { display: flex; align-items: center; gap: 14px; }
 .brand { display: flex; align-items: center; gap: 12px; }
-.brand-logo { width: 34px; height: 34px; border-radius: 10px; }
+.brand-logo { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; }
+.brand-logo svg, .hero-logo svg { width: 100%; height: 100%; }
 .brand-copy { min-width: 0; }
 .brand-name { font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; color: var(--accent); }
 .brand-subtitle { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em; }
@@ -60,7 +63,7 @@ button { cursor: pointer; }
 /* ── Hero ────────────────────────────────────────────── */
 .hero-panel { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px; }
 .hero-mark { width: 80px; height: 80px; border-radius: 24px; display: grid; place-items: center; background: linear-gradient(180deg, rgba(255,68,56,0.18), rgba(255,140,66,0.08)); border: 1px solid rgba(255,255,255,0.08); box-shadow: var(--shadow); }
-.hero-logo { width: 52px; height: 52px; border-radius: 14px; }
+.hero-logo { width: 52px; height: 52px; border-radius: 14px; display: inline-flex; }
 .hero-title { margin: 0; max-width: 720px; font-size: clamp(2.4rem, 4.5vw, 3.8rem); line-height: 0.95; font-weight: 800; letter-spacing: -0.055em; }
 
 /* ── Messages ────────────────────────────────────────── */
