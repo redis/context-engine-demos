@@ -5,7 +5,7 @@ Technical Reveal.js presentation for the ElectroHub domain pack.
 Open locally:
 
 ```bash
-cd /Users/jeremy.plichta/git/reddash/presentations/electrohub-director-demo
+cd domains/electrohub/presentations/director-demo
 python3 -m http.server 8015
 ```
 

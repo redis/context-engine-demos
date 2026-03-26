@@ -165,6 +165,7 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
     yield sse("status", text="Initializing agent…", ts=timer.elapsed_ms())
 
     agent = await get_agent()
+    defer_final_answer = runtime_config.get("enable_post_model_verifier", False)
 
     thread_id = request.thread_id or "default"
     latest_message = request.messages[-1].content if request.messages else ""
@@ -243,24 +244,30 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                 )
 
         elif kind == "on_chat_model_stream":
-            # Defer rendering assistant text until the graph finishes so the
-            # verifier hook can rewrite the final answer if needed.
-            continue
+            if defer_final_answer:
+                # Defer rendering assistant text until the graph finishes so the
+                # verifier hook can rewrite the final answer if needed.
+                continue
+            chunk = event["data"].get("chunk")
+            if chunk and hasattr(chunk, "content") and chunk.content:
+                if not (hasattr(chunk, "tool_calls") and chunk.tool_calls):
+                    yield sse("text-delta", delta=chunk.content)
 
-    if runtime_config.get("enable_post_model_verifier", False) and settings.show_final_verifier_trace_step:
+    if defer_final_answer and settings.show_final_verifier_trace_step:
         yield sse("thinking-step", step="Validate the final answer against recent context and tool results.", ts=timer.elapsed_ms())
         yield sse("status", text="Verifying final answer…", ts=timer.elapsed_ms())
 
-    final_text = ""
-    if hasattr(agent, "aget_state"):
-        snapshot = await agent.aget_state(config)
-        messages = snapshot.values.get("messages", []) if snapshot and snapshot.values else []
-        for msg in reversed(messages):
-            if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
-                final_text = msg.content if isinstance(msg.content, str) else str(msg.content)
-                break
-    if final_text:
-        yield sse("text-delta", delta=final_text)
+    if defer_final_answer:
+        final_text = ""
+        if hasattr(agent, "aget_state"):
+            snapshot = await agent.aget_state(config)
+            messages = snapshot.values.get("messages", []) if snapshot and snapshot.values else []
+            for msg in reversed(messages):
+                if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
+                    final_text = msg.content if isinstance(msg.content, str) else str(msg.content)
+                    break
+        if final_text:
+            yield sse("text-delta", delta=final_text)
     yield sse("done", totalElapsedMs=timer.elapsed_ms())
 
 
