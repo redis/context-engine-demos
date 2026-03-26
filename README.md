@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🍕 Reddash
+# Context Surfaces Demos
 
-**Food-delivery support intelligence powered by Redis Context Surfaces**
+**Reusable demo apps powered by Redis Context Surfaces**
 
-Ask about order status, late deliveries, refund policies, and more —
+Domain-specific demo apps for agentic workflows over structured Redis data,
 with full tool-call visibility in a dark-mode chat UI.
 
 [Getting Started](#getting-started) · [Architecture](#architecture) · [Demo Paths](#demo-paths)
@@ -15,9 +15,12 @@ with full tool-call visibility in a dark-mode chat UI.
 
 ## What is this?
 
-Reddash is now the first built-in **domain pack** in a reusable multi-domain demo framework. The shared runtime shows how **Redis Context Surfaces** turns your Redis data into auto-generated [MCP](https://modelcontextprotocol.io/) tools that any AI agent can call. Instead of stuffing documents into a vector store and hoping the LLM figures it out, Context Surfaces gives agents **structured, scoped, real-time access** to your operational data.
+Context Surfaces Demos is a multi-domain demo framework built around **Redis Context Surfaces**. The shared runtime shows how Context Surfaces turns Redis data into auto-generated [MCP](https://modelcontextprotocol.io/) tools that an AI agent can call. Instead of stuffing documents into a vector store and hoping the LLM figures it out, Context Surfaces gives agents **structured, scoped, real-time access** to operational data.
 
-The active built-in domain is a food-delivery support agent that can chain 7+ tool calls across customers, orders, drivers, delivery events, payments, and policies — all backed by Redis Cloud.
+The repo currently includes built-in demo domains for:
+
+- `reddash` — food-delivery support
+- `electrohub` — electronics retail and order support
 
 **Two modes, same UI:**
 
@@ -52,8 +55,8 @@ You will also need:
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/<your-org>/reddash.git
-cd reddash
+git clone https://github.com/<your-org>/context-surfaces-demos.git
+cd context-surfaces-demos
 cp .env.example .env
 ```
 
@@ -114,9 +117,12 @@ make dev
 
 Open http://localhost:3040 and try:
 
-- *"Why is my order running late?"*
-- *"How much was I charged for my last order?"*
-- *"What's your refund policy for late deliveries?"*
+- In `reddash`:
+  - *"Why is my order running late?"*
+  - *"How much was I charged for my last order?"*
+- In `electrohub`:
+  - *"Show me my recent ElectroHub orders."*
+  - *"Can I pick that up at my local store?"*
 
 ---
 
@@ -143,9 +149,9 @@ Open http://localhost:3040 and try:
 
 ---
 
-## Data Model
+## Example Data Model
 
-Nine entity types model a food-delivery platform:
+The `reddash` domain models a food-delivery platform with nine entity types:
 
 | Entity | Key Pattern | Key Indexed Fields |
 |--------|-------------|-------------------|
@@ -159,13 +165,18 @@ Nine entity types model a food-delivery platform:
 | **SupportTicket** | `reddash_support_ticket:{id}` | customer_id, order_id, category, status |
 | **Policy** | `reddash_policy:{id}` | title, category, content, content_embedding (vector) |
 
-Reddash schema definitions live in [`domains/reddash/schema.py`](domains/reddash/schema.py). A backward-compatible re-export still exists at `schemas/reddash_schema.py`.
+Reddash schema definitions live in [`domains/reddash/schema.py`](domains/reddash/schema.py). ElectroHub schema definitions live in [`domains/electrohub/schema.py`](domains/electrohub/schema.py).
 
 ---
 
 ## Demo Paths
 
-See [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md) for four scripted conversation flows:
+See:
+
+- [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md)
+- [`domains/electrohub/docs/demo_paths.md`](domains/electrohub/docs/demo_paths.md)
+
+Reddash includes four scripted conversation flows:
 
 1. **Late Order Investigation** ⭐ — 7-tool chain across orders, drivers, delivery events, and policies
 2. **Payment & Membership** — itemized charges, membership tier awareness
@@ -210,7 +221,7 @@ Example:
 ## Project Structure
 
 ```
-reddash/
+context-surfaces-demos/
 ├── backend/app/             # Shared FastAPI + LangGraph runtime
 │   ├── core/                # Domain contract, schema types, loader
 │   ├── main.py              # App entry, SSE endpoints, /api/domain-config
