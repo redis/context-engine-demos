@@ -91,9 +91,7 @@ make generate-data DOMAIN=reddash
 make setup-surface
 ```
 
-This registers your Redis instance, creates a Context Surface with the active domain's generated models, generates an agent key, and writes `CTX_SURFACE_ID`, `CTX_REDIS_INSTANCE_ID`, and `MCP_AGENT_KEY` back into `.env`.
-
-> Already have a Redis instance registered? Set `CTX_REDIS_INSTANCE_ID` in `.env` first to reuse it.
+This creates a Context Surface with the active domain's generated models, embeds the current Redis connection settings as the surface data source, generates an agent key, and writes `CTX_SURFACE_ID` and `MCP_AGENT_KEY` back into `.env`.
 
 ### 5. Load data
 
@@ -176,6 +174,17 @@ See [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md) f
 
 > **Tip:** After each path, toggle to Simple RAG mode and ask the same question to see the contrast.
 
+## Presentations
+
+Keep domain-specific presentations with the domain itself:
+
+- `domains/<domain-id>/presentations/`
+
+Example:
+
+- [`domains/electrohub/presentations/director-demo/index.html`](domains/electrohub/presentations/director-demo/index.html)
+- [`domains/electrohub/presentations/director-demo/README.md`](domains/electrohub/presentations/director-demo/README.md)
+
 ---
 
 ## Makefile Reference
@@ -186,7 +195,7 @@ See [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md) f
 | `make validate-domain DOMAIN=reddash` | Validate the chosen domain pack |
 | `make generate-models DOMAIN=reddash` | Regenerate ContextModel classes for the chosen domain |
 | `make generate-data DOMAIN=reddash` | Generate sample JSONL data in `output/<domain>` |
-| `make setup-surface DOMAIN=reddash` | Register Redis, create surface + agent key via ctxctl |
+| `make setup-surface DOMAIN=reddash` | Create surface + agent key using embedded Redis connection settings |
 | `make load-data DOMAIN=reddash` | Import JSONL data via Context Surfaces API |
 | `make smoke-domain DOMAIN=reddash` | Run a lightweight scaffold/data/model smoke test |
 | `make create-domain DOMAIN=electronics-store` | Scaffold a new domain pack |
@@ -210,14 +219,16 @@ reddash/
 │   ├── rag_service.py       # Shared simple-RAG comparison mode
 │   └── settings.py          # Pydantic settings (.env loader)
 ├── domains/
-│   └── reddash/             # First built-in domain pack
+│   ├── reddash/             # Delivery-support reference domain
+│   └── electrohub/          # Electronics retail reference domain
 │       ├── domain.py        # DOMAIN export implementing the contract
 │       ├── schema.py        # Entity definitions
 │       ├── prompt.py        # Domain prompt/playbooks
 │       ├── data_generator.py
 │       ├── generated_models.py
-│       ├── assets/logo.svg
+│       ├── assets/logo.(svg|png|jpg|webp)
 │       └── docs/demo_paths.md
+│       └── presentations/   # Domain-specific decks and assets
 ├── frontend/src/            # React + Vite chat UI
 │   ├── App.tsx              # Shared chat UI shell
 │   └── styles.css           # Theme-driven styles
@@ -239,6 +250,10 @@ make validate-domain DOMAIN=electronics-store
 
 Then fill in `domains/electronics-store/` and follow the repo-local skill at
 [`./.codex/skills/domain-pack-authoring/SKILL.md`](.codex/skills/domain-pack-authoring/SKILL.md).
+Domain logos can be `svg`, `png`, `jpg`, `jpeg`, or `webp` as long as
+`branding.logo_path` matches the asset under `domains/<domain>/assets/`.
+If the domain has presentation material, keep it under
+`domains/<domain-id>/presentations/`.
 
 ---
 

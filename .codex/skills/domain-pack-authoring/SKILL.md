@@ -16,11 +16,12 @@ Use this skill when the task is to add a new business domain, refactor an existi
 5. Implement prompt guidance in `domains/<domain-id>/prompt.py`.
 6. Implement domain demo-data generation in `domains/<domain-id>/data_generator.py`.
 7. Add or update scripted demo paths in `domains/<domain-id>/docs/demo_paths.md`.
-8. Run validation and smoke tests:
+8. If the domain includes presentation material, keep it under `domains/<domain-id>/presentations/`.
+9. Run validation and smoke tests:
    `uv run python scripts/validate_domain.py --domain <domain-id>`
    `uv run python scripts/generate_models.py --domain <domain-id>`
    `uv run python scripts/smoke_domain.py --domain <domain-id>`
-9. If shared framework changes were required, run repo tests before finishing.
+10. If shared framework changes were required, run repo tests before finishing.
 
 ## Required Layout
 
@@ -33,7 +34,7 @@ domains/<domain-id>/
   schema.py
   prompt.py
   data_generator.py
-  assets/logo.svg
+  assets/logo.<svg|png|jpg|jpeg|webp>
   docs/demo_paths.md
 ```
 
@@ -44,11 +45,18 @@ domains/<domain-id>/generated_models.py
 output/<domain-id>/
 ```
 
+Optional docs and collateral:
+
+```text
+domains/<domain-id>/presentations/
+```
+
 ## Contract Rules
 
 - `domains/<domain-id>/domain.py` must export `DOMAIN`.
 - `DOMAIN` must satisfy the shared contract in `backend/app/core/domain_contract.py`.
 - Keep branding, namespace, RAG config, and identity config declarative in `manifest`.
+- `manifest.branding.logo_path` may point to any supported image asset under `domains/<domain-id>/assets/`.
 - Keep code hooks limited to:
   - `build_system_prompt`
   - `get_internal_tool_definitions`
@@ -56,6 +64,14 @@ output/<domain-id>/
   - `write_dataset_meta`
   - `generate_demo_data`
   - `validate`
+
+## Quality Bar
+
+- Seed the domain with at least one flagship demo user and enough data to support 2-3 realistic conversation paths.
+- Make starter prompts correspond to real records in the generated dataset.
+- Keep the prompt focused on tool-use workflows, not generic brand copy.
+- Document the flagship paths in `docs/demo_paths.md` so an agent or human can run the demo consistently.
+- If you build a deck for the domain, keep links, assets, and README notes inside `domains/<domain-id>/presentations/`.
 
 ## Separation Rules
 
@@ -77,4 +93,3 @@ Do not consider the task complete if any of these remain:
 ## References
 
 Read [references/checklist.md](references/checklist.md) when you need the exact file-by-file checklist.
-

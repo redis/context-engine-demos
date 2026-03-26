@@ -12,7 +12,9 @@
     "@fontsource/ibm-plex-mono": "^5.1.1",
     "@fontsource/manrope": "^5.2.8",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
@@ -23,4 +25,3 @@
     "vite": "^6.0.5"
   }
 }
-

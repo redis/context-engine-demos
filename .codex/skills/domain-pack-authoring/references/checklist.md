@@ -8,7 +8,9 @@ Use this checklist after scaffolding a domain.
 - `generated_models_module` and `generated_models_path` match the folder
 - `output_dir` is `output/<domain-id>`
 - namespace keys are unique
+- `logo_path` points to a real asset under `domains/<domain-id>/assets/`
 - branding includes at least one starter prompt
+- identity defaults line up with the generated demo user
 
 ## `schema.py`
 
@@ -22,6 +24,18 @@ Use this checklist after scaffolding a domain.
 - writes all files declared by the schema
 - returns `GeneratedDataset`
 - updates demo identity env vars when the demo uses a signed-in user
+- creates records that support the documented flagship demo paths
+
+## `docs/demo_paths.md`
+
+- includes at least two realistic conversation paths
+- references real products, stores, orders, or policies from the generated data
+
+## `presentations/` (optional)
+
+- any domain-specific deck lives under `domains/<domain-id>/presentations/`
+- deck assets are copied into the domain folder instead of referencing files from `~/Desktop`, `~/Downloads`, or another repo
+- a short local run note exists if the presentation needs a static server
 
 ## Validation Commands
 

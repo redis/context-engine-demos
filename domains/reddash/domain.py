@@ -96,10 +96,57 @@ class ReddashDomain:
     def get_entity_specs(self) -> tuple[EntitySpec, ...]:
         return ENTITY_SPECS
 
-    def build_system_prompt(self, *, mcp_tools: Sequence[dict[str, Any]]) -> str:
+    def build_system_prompt(
+        self,
+        *,
+        mcp_tools: Sequence[dict[str, Any]],
+        runtime_config: dict[str, Any] | None = None,
+    ) -> str:
+        del runtime_config
         return build_system_prompt(mcp_tools=mcp_tools)
 
-    def get_internal_tool_definitions(self) -> Sequence[InternalToolDefinition]:
+    def build_answer_verifier_prompt(self, *, runtime_config: dict[str, Any] | None = None) -> str:
+        del runtime_config
+        return (
+            "When the user refers to 'that order', 'that charge', or similar follow-ups, resolve the reference to the exact "
+            "order, payment, or ticket from the prior turn. Do not mention refunds, credits, or policy outcomes unless the "
+            "tool results or cited policy support them."
+        )
+
+    def describe_tool_trace_step(
+        self,
+        *,
+        tool_name: str,
+        payload: Any,
+        runtime_config: dict[str, Any] | None = None,
+    ) -> str | None:
+        del runtime_config
+        detail = ""
+        if isinstance(payload, dict):
+            for key in ("query", "text", "order_id", "customer_id", "payment_id", "ticket_id"):
+                value = payload.get(key)
+                if value:
+                    detail = str(value)
+                    break
+
+        if tool_name == self.manifest.identity.tool_name:
+            return "Identify the signed-in customer before checking account or order data."
+        if tool_name == "get_current_time":
+            return "Compare the current time against order and delivery timestamps."
+        if tool_name.startswith("search_policy_by_text"):
+            return f"Search delivery policy guidance: {detail or 'policy search'}."
+        if tool_name.startswith("filter_driver_by_"):
+            return "Check the live driver assignment and status for the relevant order."
+        if tool_name.startswith("filter_payment_by_"):
+            return "Inspect the payment record before answering charges, credits, or refunds."
+        return None
+
+    def get_internal_tool_definitions(
+        self,
+        *,
+        runtime_config: dict[str, Any] | None = None,
+    ) -> Sequence[InternalToolDefinition]:
+        del runtime_config
         return (
             InternalToolDefinition(
                 name=self.manifest.identity.tool_name,

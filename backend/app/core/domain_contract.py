@@ -104,10 +104,19 @@ class DomainPack(Protocol):
     def get_entity_specs(self) -> tuple[EntitySpec, ...]:
         ...
 
-    def build_system_prompt(self, *, mcp_tools: Sequence[dict[str, Any]]) -> str:
+    def build_system_prompt(
+        self,
+        *,
+        mcp_tools: Sequence[dict[str, Any]],
+        runtime_config: dict[str, Any] | None = None,
+    ) -> str:
         ...
 
-    def get_internal_tool_definitions(self) -> Sequence[InternalToolDefinition]:
+    def get_internal_tool_definitions(
+        self,
+        *,
+        runtime_config: dict[str, Any] | None = None,
+    ) -> Sequence[InternalToolDefinition]:
         ...
 
     def execute_internal_tool(self, tool_name: str, arguments: dict[str, Any], settings: Any) -> dict[str, Any]:
