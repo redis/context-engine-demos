@@ -8,6 +8,77 @@ from context_surfaces import UnifiedClient
 from backend.app.settings import Settings
 
 
+def _extract_wrapped_content_text(raw: str) -> str | None:
+    start_marker = "content='"
+    start = raw.find(start_marker)
+    if start < 0:
+        return None
+
+    content_start = start + len(start_marker)
+    value = ""
+
+    for index in range(content_start, len(raw)):
+        char = raw[index]
+        previous = raw[index - 1] if index > content_start else ""
+
+        if char == "'" and previous != "\\":
+            return value
+
+        value += char
+
+    return None
+
+
+def _parse_wrapped_content_json(raw: str) -> Any | None:
+    wrapped = _extract_wrapped_content_text(raw)
+    if wrapped is None:
+        return None
+    try:
+        return json.loads(wrapped.replace("\\'", "'"))
+    except json.JSONDecodeError:
+        return None
+
+
+def _normalize_tool_result_payload(result: Any) -> dict[str, Any]:
+    if isinstance(result, dict):
+        content = result.get("content", [])
+        if content and isinstance(content, list) and content[0].get("type") == "text":
+            text = content[0].get("text", "")
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                parsed = _parse_wrapped_content_json(text)
+            if isinstance(parsed, dict):
+                return parsed
+            return {"raw_text": text}
+        raw_text = result.get("raw_text")
+        if isinstance(raw_text, str):
+            parsed = _parse_wrapped_content_json(raw_text)
+            if isinstance(parsed, dict):
+                return parsed
+        nested_result = result.get("result")
+        if isinstance(nested_result, str):
+            parsed = _parse_wrapped_content_json(nested_result)
+            if isinstance(parsed, dict):
+                return parsed
+        return result
+
+    if isinstance(result, str):
+        parsed = _parse_wrapped_content_json(result)
+        if isinstance(parsed, dict):
+            return parsed
+        try:
+            loaded = json.loads(result)
+        except json.JSONDecodeError:
+            return {"result": result}
+        return loaded if isinstance(loaded, dict) else {"result": loaded}
+
+    parsed = _parse_wrapped_content_json(str(result))
+    if isinstance(parsed, dict):
+        return parsed
+    return {"result": result}
+
+
 class ContextSurfaceService:
     """Wraps the context-surfaces SDK to list and call MCP tools.
 
@@ -40,13 +111,4 @@ class ContextSurfaceService:
                 tool_name=tool_name,
                 arguments=arguments,
             )
-        if isinstance(result, dict):
-            content = result.get("content", [])
-            if content and isinstance(content, list) and content[0].get("type") == "text":
-                text = content[0].get("text", "")
-                try:
-                    return json.loads(text)
-                except json.JSONDecodeError:
-                    return {"raw_text": text}
-        return result if isinstance(result, dict) else {"result": result}
-
+        return _normalize_tool_result_payload(result)
