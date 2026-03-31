@@ -146,6 +146,151 @@ function MarkdownMessage({ content }: { content: string }) {
   );
 }
 
+function extractWrappedContextJson(raw: string): string | null {
+  const startMarker = "content='";
+  const start = raw.indexOf(startMarker);
+  if (start < 0) return null;
+
+  const contentStart = start + startMarker.length;
+  let value = "";
+
+  for (let index = contentStart; index < raw.length; index += 1) {
+    const char = raw[index];
+    const previousChar = index > contentStart ? raw[index - 1] : "";
+
+    if (char === "'" && previousChar !== "\\") {
+      return value;
+    }
+
+    value += char;
+  }
+
+  return null;
+}
+
+function parseWrappedContextJson(raw: string): unknown | null {
+  const wrapped = extractWrappedContextJson(raw);
+  if (!wrapped) return null;
+
+  try {
+    return JSON.parse(wrapped.replaceAll("\\'", "'"));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeToolPayload(payload: unknown): unknown {
+  if (typeof payload === "string") {
+    return parseWrappedContextJson(payload) ?? payload;
+  }
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+
+  if ("result" in payload && typeof payload.result === "string") {
+    return parseWrappedContextJson(payload.result) ?? payload;
+  }
+
+  if ("raw_text" in payload && typeof payload.raw_text === "string") {
+    return parseWrappedContextJson(payload.raw_text) ?? payload;
+  }
+
+  return payload;
+}
+
+function JsonToken({ value, className }: { value: string; className?: string }) {
+  return <span className={className}>{value}</span>;
+}
+
+function renderJsonValue(value: unknown, depth = 0): React.JSX.Element {
+  if (value === null) {
+    return <JsonToken value="null" className="json-null" />;
+  }
+
+  if (typeof value === "string") {
+    return <JsonToken value={JSON.stringify(value)} className="json-string" />;
+  }
+
+  if (typeof value === "number") {
+    return <JsonToken value={String(value)} className="json-number" />;
+  }
+
+  if (typeof value === "boolean") {
+    return <JsonToken value={String(value)} className="json-boolean" />;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return (
+        <>
+          <JsonToken value="[" className="json-punct" />
+          <JsonToken value="]" className="json-punct" />
+        </>
+      );
+    }
+
+    return (
+      <>
+        <JsonToken value="[" className="json-punct" />
+        {value.map((item, index) => (
+          <div key={`array-${depth}-${index}`} className="json-line" style={{ paddingLeft: `${(depth + 1) * 1.25}rem` }}>
+            {renderJsonValue(item, depth + 1)}
+            {index < value.length - 1 && <JsonToken value="," className="json-punct" />}
+          </div>
+        ))}
+        <div className="json-line" style={{ paddingLeft: `${depth * 1.25}rem` }}>
+          <JsonToken value="]" className="json-punct" />
+        </div>
+      </>
+    );
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value);
+
+    if (entries.length === 0) {
+      return (
+        <>
+          <JsonToken value="{" className="json-punct" />
+          <JsonToken value="}" className="json-punct" />
+        </>
+      );
+    }
+
+    return (
+      <>
+        <JsonToken value="{" className="json-punct" />
+        {entries.map(([key, entryValue], index) => (
+          <div key={`object-${depth}-${key}`} className="json-line" style={{ paddingLeft: `${(depth + 1) * 1.25}rem` }}>
+            <JsonToken value={JSON.stringify(key)} className="json-key" />
+            <JsonToken value=": " className="json-punct" />
+            {renderJsonValue(entryValue, depth + 1)}
+            {index < entries.length - 1 && <JsonToken value="," className="json-punct" />}
+          </div>
+        ))}
+        <div className="json-line" style={{ paddingLeft: `${depth * 1.25}rem` }}>
+          <JsonToken value="}" className="json-punct" />
+        </div>
+      </>
+    );
+  }
+
+  return <JsonToken value={JSON.stringify(String(value))} className="json-string" />;
+}
+
+function ToolPayloadJson({ payload }: { payload: unknown }) {
+  const normalized = normalizeToolPayload(payload);
+
+  return (
+    <div className="json-scrollbox">
+      <div className="json-tree">
+        {renderJsonValue(normalized)}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [health, setHealth] = useState<HealthState>(null);
   const [domain, setDomain] = useState<DomainConfig>(null);
@@ -357,13 +502,13 @@ export default function App() {
                             {entry.tool.callPayload && (
                               <div className="tool-detail-section">
                                 <div className="tool-detail-label">Call</div>
-                                <pre>{JSON.stringify(entry.tool.callPayload, null, 2)}</pre>
+                                <ToolPayloadJson payload={entry.tool.callPayload} />
                               </div>
                             )}
                             {entry.tool.resultPayload && (
                               <div className="tool-detail-section">
                                 <div className="tool-detail-label">Result</div>
-                                <pre>{JSON.stringify(entry.tool.resultPayload, null, 2)}</pre>
+                                <ToolPayloadJson payload={entry.tool.resultPayload} />
                               </div>
                             )}
                           </details>

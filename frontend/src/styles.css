@@ -170,6 +170,32 @@ button { cursor: pointer; }
 .tool-name { font-weight: 800; letter-spacing: -0.01em; }
 .tool-detail-section { display: grid; gap: 8px; margin-bottom: 12px; }
 .tool-detail-label { color: var(--muted); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.json-scrollbox {
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+    rgba(5, 4, 2, 0.46);
+}
+.json-tree {
+  min-width: max-content;
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: pre;
+  color: #d4c8b0;
+}
+.json-line { min-width: max-content; }
+.json-punct { color: #b8b0a4; }
+.json-key { color: #f2bf82; }
+.json-string { color: #9ad7c2; }
+.json-number { color: #8ec8ff; }
+.json-boolean { color: #ff9f7d; }
+.json-null { color: #c6a9ff; }
 
 pre { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; background: rgba(5,4,2,0.46); white-space: pre-wrap; word-break: break-word; font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; line-height: 1.6; color: #d4c8b0; }
 
