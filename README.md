@@ -1,6 +1,6 @@
 <div align="center">
 
-# Context Surfaces Demos
+# Context Engine Demos
 
 **Reusable demo apps powered by Redis Context Surfaces**
 
@@ -15,7 +15,7 @@ with full tool-call visibility in a dark-mode chat UI.
 
 ## What is this?
 
-Context Surfaces Demos is a multi-domain demo framework built around **Redis Context Surfaces**. The shared runtime shows how Context Surfaces turns Redis data into auto-generated [MCP](https://modelcontextprotocol.io/) tools that an AI agent can call. Instead of stuffing documents into a vector store and hoping the LLM figures it out, Context Surfaces gives agents **structured, scoped, real-time access** to operational data.
+Context Engine Demos is a multi-domain demo framework built around **Redis Context Surfaces**. The shared runtime shows how Context Surfaces turns Redis data into auto-generated [MCP](https://modelcontextprotocol.io/) tools that an AI agent can call. Instead of stuffing documents into a vector store and hoping the LLM figures it out, Context Surfaces gives agents **structured, scoped, real-time access** to operational data.
 
 The repo currently includes built-in demo domains for:
 
@@ -55,8 +55,8 @@ You will also need:
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/<your-org>/context-surfaces-demos.git
-cd context-surfaces-demos
+git clone https://github.com/redis/context-engine-demos.git
+cd context-engine-demos
 cp .env.example .env
 ```
 
@@ -221,7 +221,7 @@ Example:
 ## Project Structure
 
 ```
-context-surfaces-demos/
+context-engine-demos/
 ├── backend/app/             # Shared FastAPI + LangGraph runtime
 │   ├── core/                # Domain contract, schema types, loader
 │   ├── main.py              # App entry, SSE endpoints, /api/domain-config
