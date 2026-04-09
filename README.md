@@ -63,7 +63,7 @@ cp .env.example .env
 Edit `.env` and fill in three values:
 
 ```env
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=your-openai-api-key
 REDIS_HOST=redis-xxxxx.c1.us-east-1-2.ec2.redns.redis-cloud.com
 REDIS_PORT=12345
 REDIS_PASSWORD=your-redis-password
