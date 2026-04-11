@@ -1,6 +1,6 @@
 """Create or reuse the Context Surface for the active domain.
 
-This script targets the current admin API contract, which now expects
+This script targets the current admin API contract, which expects
 embedded Redis connection settings under ``data_source.connection_config``
 when creating a surface.
 """
@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import redis
 from dotenv import dotenv_values
 from context_surfaces import config as cs_config
 from context_surfaces.cli.main import _parse_data_model_from_python
@@ -23,6 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.app.core.domain_loader import load_domain
+from backend.app.redis_connection import create_redis_client
 from backend.app.settings import ENV_PATH, get_settings
 
 
@@ -84,6 +86,7 @@ def _create_surface(
         "data_model": data_model,
         "data_source": {
             "type": "redis",
+            "name": "redis",
             "connection_config": {
                 "addr": redis_addr,
                 "username": redis_username,
@@ -145,6 +148,68 @@ def _describe_surface(*, api_url: str, admin_key: str, surface_id: str) -> dict[
     return response.json()
 
 
+def _probe_redis_connection(
+    *,
+    redis_host: str,
+    redis_port: int,
+    redis_username: str,
+    redis_password: str,
+    redis_db: int,
+    redis_ssl: bool,
+) -> tuple[bool, str]:
+    try:
+        client = redis.Redis(
+            host=redis_host,
+            port=redis_port,
+            username=redis_username or "default",
+            password=redis_password or None,
+            db=redis_db,
+            ssl=redis_ssl,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+        )
+        client.ping()
+        return True, "ok"
+    except Exception as exc:
+        return False, str(exc)
+
+
+def _preflight_redis_connection() -> None:
+    settings = get_settings()
+    # Reuse the app's configured client first so setup and runtime validate the same settings.
+    try:
+        create_redis_client(settings).ping()
+        return
+    except Exception as exc:
+        current_error = str(exc)
+
+    alternate_ssl = not settings.redis_ssl
+    alt_ok, _ = _probe_redis_connection(
+        redis_host=settings.redis_host,
+        redis_port=settings.redis_port,
+        redis_username=settings.redis_username or "default",
+        redis_password=settings.redis_password,
+        redis_db=settings.redis_db,
+        redis_ssl=alternate_ssl,
+    )
+    if alt_ok:
+        raise RuntimeError(
+            "Redis preflight failed with the current TLS setting. "
+            f"REDIS_SSL={str(settings.redis_ssl).lower()} does not work for "
+            f"{settings.redis_host}:{settings.redis_port}, but "
+            f"REDIS_SSL={str(alternate_ssl).lower()} does. "
+            "Update .env and rerun setup."
+        )
+
+    raise RuntimeError(
+        "Redis preflight failed with the configured connection settings. "
+        f"Tried {settings.redis_host}:{settings.redis_port}/{settings.redis_db} "
+        f"with REDIS_SSL={str(settings.redis_ssl).lower()}. "
+        f"Original error: {current_error}"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--domain", default=None)
@@ -180,6 +245,8 @@ def main() -> None:
             print("Run again with --force-create to create a fresh surface.")
             sys.exit(1)
     else:
+        print("Validating Redis connection settings...")
+        _preflight_redis_connection()
         print("Creating context surface with embedded Redis data source...")
         data_model = _parse_data_model(generated_models_path, surface_name=surface_name)
         payload = _create_surface(
