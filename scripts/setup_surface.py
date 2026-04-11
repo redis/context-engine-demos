@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.app.core.domain_loader import load_domain
+from backend.app.core.domain_schema import validate_exported_data_model
 from backend.app.redis_connection import create_redis_client
 from backend.app.settings import ENV_PATH, get_settings
 
@@ -64,7 +65,15 @@ def _safe_response_text(response: httpx.Response) -> str:
 
 
 def _parse_data_model(models_path: Path, *, surface_name: str) -> dict[str, Any]:
-    return _parse_data_model_from_python(models_path, surface_name, None, None)
+    data_model = _parse_data_model_from_python(models_path, surface_name, None, None)
+    errors = validate_exported_data_model(data_model)
+    if errors:
+        joined = "\n".join(f"- {error}" for error in errors)
+        raise RuntimeError(
+            "Generated data model is invalid for Redis JSON indexing:\n"
+            f"{joined}"
+        )
+    return data_model
 
 
 def _create_surface(

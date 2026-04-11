@@ -17,7 +17,7 @@ from backend.app.core.domain_contract import (
     RagConfig,
     ThemeConfig,
 )
-from backend.app.core.domain_schema import EntitySpec
+from backend.app.core.domain_schema import EntitySpec, validate_entity_specs
 from backend.app.redis_connection import create_redis_client
 from domains.electrohub.data_generator import DEMO_CUSTOMER, generate_demo_data
 from domains.electrohub.prompt import build_system_prompt
@@ -366,16 +366,7 @@ class ElectrohubDomain:
         return generate_demo_data(output_dir=output_dir, seed=seed, update_env_file=update_env_file)
 
     def validate(self) -> list[str]:
-        errors: list[str] = []
-        seen_classes: set[str] = set()
-        seen_files: set[str] = set()
-        for spec in self.get_entity_specs():
-            if spec.class_name in seen_classes:
-                errors.append(f"Duplicate entity class name: {spec.class_name}")
-            if spec.file_name in seen_files:
-                errors.append(f"Duplicate entity file name: {spec.file_name}")
-            seen_classes.add(spec.class_name)
-            seen_files.add(spec.file_name)
+        errors = validate_entity_specs(self.get_entity_specs())
         if not (ROOT / self.manifest.branding.logo_path).exists():
             errors.append(f"Logo file not found: {self.manifest.branding.logo_path}")
         if not self.manifest.branding.starter_prompts:
