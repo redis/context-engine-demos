@@ -8,6 +8,8 @@ def test_reddash_domain_loads() -> None:
     assert domain.manifest.id == "reddash"
     assert Path(domain.manifest.branding.logo_path).exists()
     assert domain.manifest.branding.starter_prompts
+    assert domain.manifest.branding.ui.show_platform_surface is False
+    assert domain.manifest.branding.ui.show_live_updates is False
 
 
 def test_reddash_data_generator_writes_expected_files(tmp_path: Path) -> None:

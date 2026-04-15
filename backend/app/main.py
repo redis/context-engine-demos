@@ -6,11 +6,12 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any, AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage
 
+from backend.app.domain_events import stream_domain_events
 from backend.app.context_surface_service import ContextSurfaceService
 from backend.app.core.domain_loader import get_active_domain
 from backend.app.contracts import ChatRequest
@@ -33,7 +34,7 @@ app.add_middleware(
 
 internal_tools = InternalToolService(settings)
 cs_service = ContextSurfaceService(settings)
-rag_service = SimpleRAGService(settings)
+rag_service = SimpleRAGService(settings, cs_service)
 runtime_config = domain_runtime_config(domain, settings)
 
 _langgraph_agent = None
@@ -137,11 +138,13 @@ def _llm_phase_label(*, llm_call_index: int, tool_calls_seen: int) -> str:
 
 @app.get("/api/health")
 async def health() -> JSONResponse:
+    mcp_tool_names = [tool.get("name", "") for tool in await cs_service.list_tools()]
     return JSONResponse({
         "ok": True,
         "domain": domain.manifest.id,
         "mcp_enabled": bool(settings.mcp_agent_key),
         "internal_tools": internal_tool_names(settings),
+        "mcp_tools": [name for name in mcp_tool_names if name],
     })
 
 
@@ -156,6 +159,7 @@ async def domain_config() -> JSONResponse:
         "placeholder_text": branding.placeholder_text,
         "starter_prompts": [card.model_dump() for card in branding.starter_prompts],
         "theme": branding.theme.model_dump(),
+        "ui": branding.ui.model_dump(),
         "logo_src": _logo_src(ROOT_DIR / branding.logo_path),
     })
 
@@ -196,6 +200,7 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                 last_thinking_step = thinking_step
                 yield sse("thinking-step", step=thinking_step, ts=timer.elapsed_ms())
             yield sse("tool-call", toolName=name, toolKind=_tool_kind(name),
+                       runId=event["run_id"],
                        payload=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
                        ts=timer.elapsed_ms())
 
@@ -209,6 +214,7 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
             start = tool_start_times.pop(event["run_id"], perf_counter())
             duration_ms = max(round((perf_counter() - start) * 1000), 1)
             yield sse("tool-result", toolName=name, toolKind=_tool_kind(name),
+                       runId=event["run_id"],
                        payload=output, durationMs=duration_ms, ts=timer.elapsed_ms())
 
         elif kind == "on_chat_model_start":
@@ -287,5 +293,14 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
 
     return StreamingResponse(
         cs_event_stream(request),
+        media_type="text/event-stream",
+    )
+
+
+@app.get("/api/domain-events/stream")
+async def domain_events_stream(request: Request, cursor: str = "$", history: int = 12) -> StreamingResponse:
+    del request
+    return StreamingResponse(
+        stream_domain_events(settings, domain, cursor=cursor, history_limit=history),
         media_type="text/event-stream",
     )

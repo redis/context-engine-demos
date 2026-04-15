@@ -9,6 +9,8 @@ def test_electrohub_domain_loads() -> None:
     assert domain.manifest.id == "electrohub"
     assert Path(domain.manifest.branding.logo_path).exists()
     assert domain.manifest.branding.starter_prompts
+    assert domain.manifest.branding.ui.show_platform_surface is False
+    assert domain.manifest.branding.ui.show_live_updates is False
 
     default_runtime_config = domain.get_runtime_config(settings=None)
     tool_names = {tool.name for tool in domain.get_internal_tool_definitions(runtime_config=default_runtime_config)}

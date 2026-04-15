@@ -1,5 +1,9 @@
 # Environment & secrets
 .env
+.env.local
+.env.shared
+.env.bak
+tinytown.toml
 
 # Python
 __pycache__/
@@ -32,3 +36,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Tinytown runtime artifacts
+.tt

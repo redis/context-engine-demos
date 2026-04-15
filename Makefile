@@ -2,9 +2,11 @@ BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8040
 FRONTEND_PORT ?= 3040
 DOMAIN ?= reddash
+EXTRA_ENV_FILE ?=
 
 .PHONY: help install backend-install frontend-install dev backend frontend \
-	generate-data generate-models load-data setup-surface validate-domain smoke-domain create-domain flush-redis reset
+	generate-data generate-models load-data setup-surface validate-domain smoke-domain create-domain flush-redis reset \
+	publish-domain-event cache-domain-price-csvs
 
 help:
 	@echo "Targets:"
@@ -16,6 +18,9 @@ help:
 	@echo "  make validate-domain  Validate the active domain pack"
 	@echo "  make smoke-domain     Generate models/data and verify the domain structure"
 	@echo "  make create-domain    Scaffold a new domain pack for DOMAIN=$(DOMAIN)"
+	@echo "  make publish-domain-event DOMAIN=<domain>  Publish a random domain live-feed event"
+	@echo "  make cache-domain-price-csvs DOMAIN=<domain>  Run a domain-local price cache script when available"
+	@echo "    Optional: EXTRA_ENV_FILE=/path/to/shared.env"
 	@echo "  make flush-redis      Flush the Redis database (FLUSHDB)"
 	@echo "  make reset            Flush Redis + recreate surface + reload data"
 	@echo "  make backend          Start FastAPI backend"
@@ -50,6 +55,30 @@ smoke-domain:
 
 create-domain:
 	@uv run python scripts/create_domain.py $(DOMAIN)
+
+publish-domain-event:
+	@set -a; \
+	if [ -f ".env.shared" ]; then . ./.env.shared; fi; \
+	if [ -f ".env.local" ]; then . ./.env.local; fi; \
+	if [ -n "$(EXTRA_ENV_FILE)" ] && [ -f "$(EXTRA_ENV_FILE)" ]; then . "$(EXTRA_ENV_FILE)"; fi; \
+	if [ -f ".env" ]; then . ./.env; fi; \
+	if [ ! -f "domains/$(DOMAIN)/publish_random_event.py" ]; then \
+		echo "No publish_random_event.py script found for domain '$(DOMAIN)'"; \
+		exit 1; \
+	fi; \
+	uv run python domains/$(DOMAIN)/publish_random_event.py --domain $(DOMAIN)
+
+cache-domain-price-csvs:
+	@set -a; \
+	if [ -f ".env.shared" ]; then . ./.env.shared; fi; \
+	if [ -f ".env.local" ]; then . ./.env.local; fi; \
+	if [ -n "$(EXTRA_ENV_FILE)" ] && [ -f "$(EXTRA_ENV_FILE)" ]; then . "$(EXTRA_ENV_FILE)"; fi; \
+	if [ -f ".env" ]; then . ./.env; fi; \
+	if [ ! -f "domains/$(DOMAIN)/fetch_price_csvs.py" ]; then \
+		echo "No fetch_price_csvs.py script found for domain '$(DOMAIN)'"; \
+		exit 1; \
+	fi; \
+	uv run python domains/$(DOMAIN)/fetch_price_csvs.py --years 5
 
 backend:
 	@uv run uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)

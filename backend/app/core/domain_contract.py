@@ -14,6 +14,16 @@ class PromptCard(BaseModel):
     prompt: str
 
 
+class UiConfig(BaseModel):
+    show_platform_surface: bool = False
+    show_live_updates: bool = False
+    platform_surface_eyebrow: str = "Platform surface"
+    platform_surface_title: str = "Available tools and data planes"
+    platform_data_planes: list[str] = Field(default_factory=list)
+    live_updates_eyebrow: str = "Live updates"
+    live_updates_title: str = "Live update feed"
+
+
 class ThemeConfig(BaseModel):
     bg: str
     bg_accent_a: str
@@ -38,6 +48,7 @@ class BrandingConfig(BaseModel):
     logo_path: str
     starter_prompts: list[PromptCard]
     theme: ThemeConfig
+    ui: UiConfig = Field(default_factory=UiConfig)
 
 
 class NamespaceConfig(BaseModel):
@@ -59,6 +70,9 @@ class RagConfig(BaseModel):
     return_fields: list[str]
     num_results: int = 3
     answer_system_prompt: str
+    title_fields: list[str] = Field(default_factory=lambda: ["title", "headline", "document_id"])
+    label_fields: list[str] = Field(default_factory=lambda: ["category", "ticker", "page_label", "company_id"])
+    body_fields: list[str] = Field(default_factory=lambda: ["content", "summary", "description", "text"])
 
 
 class IdentityConfig(BaseModel):

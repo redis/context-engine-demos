@@ -226,8 +226,11 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = get_settings()
-    domain = load_domain(args.domain or settings.demo_domain)
+    target_domain_id = args.domain or settings.demo_domain
+    domain = load_domain(target_domain_id)
     env = dotenv_values(ENV_PATH) if ENV_PATH.exists() else {}
+    env_domain_id = env.get("DEMO_DOMAIN", settings.demo_domain)
+    env_matches_target = env_domain_id == target_domain_id
 
     if not settings.ctx_admin_key:
         print("CTX_ADMIN_KEY is not set in .env")
@@ -240,10 +243,10 @@ def main() -> None:
         sys.exit(1)
 
     api_url = str(cs_config.api_url).rstrip("/")
-    surface_name = env.get("CTX_SURFACE_NAME", domain.manifest.namespace.surface_name)
-    agent_name = env.get("CTX_AGENT_NAME", domain.manifest.namespace.agent_name)
-    surface_id = env.get("CTX_SURFACE_ID", "") if not args.force_create else ""
-    agent_key = env.get("MCP_AGENT_KEY", "") if not args.force_create else ""
+    surface_name = env.get("CTX_SURFACE_NAME", domain.manifest.namespace.surface_name) if env_matches_target else domain.manifest.namespace.surface_name
+    agent_name = env.get("CTX_AGENT_NAME", domain.manifest.namespace.agent_name) if env_matches_target else domain.manifest.namespace.agent_name
+    surface_id = env.get("CTX_SURFACE_ID", "") if env_matches_target and not args.force_create else ""
+    agent_key = env.get("MCP_AGENT_KEY", "") if env_matches_target and not args.force_create else ""
 
     if surface_id:
         print(f"Reusing context surface: {surface_id}")
