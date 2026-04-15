@@ -1,7 +1,13 @@
 import pytest
 
 from backend.app.core.domain_loader import load_domain
-from backend.app.domain_events import build_domain_event, domain_event_stream_key, stream_domain_events
+from backend.app.domain_events import (
+    _decode_domain_event,
+    _redis_stream_id_is_older_or_equal,
+    build_domain_event,
+    domain_event_stream_key,
+    stream_domain_events,
+)
 from backend.app.settings import Settings
 
 
@@ -24,6 +30,21 @@ def test_domain_event_builder_keeps_payload_generic() -> None:
     assert event["event_type"] == "new_filing"
     assert event["ticker"] == "NVDA"
     assert event["payload"] == {"document_id": "doc-123", "importance": "high"}
+
+
+def test_decode_domain_event_restores_numeric_importance_score() -> None:
+    decoded = _decode_domain_event(
+        "1-0",
+        {"headline": "update", "importance_score": "0.75", "payload": "{}"},
+    )
+
+    assert decoded["importance_score"] == pytest.approx(0.75)
+
+
+def test_redis_stream_id_ordering_accepts_incomplete_ids() -> None:
+    assert _redis_stream_id_is_older_or_equal("0", "3-0") is True
+    assert _redis_stream_id_is_older_or_equal("3", "3-0") is True
+    assert _redis_stream_id_is_older_or_equal("4", "3-0") is False
 
 
 @pytest.mark.asyncio

@@ -179,14 +179,15 @@ class SimpleRAGService:
 
         yield _sse("status", text=f"Found {len(results)} matching documents. {rag.generating_text}", ts=timer.elapsed_ms())
 
-        context_text = "\n\n".join(
-            (
-                f"**{_result_title(result, rag.title_fields)}**"
-                + (f" ({_result_label(result, rag.label_fields)})" if _result_label(result, rag.label_fields) else "")
-                + f":\n{_result_body(result, rag.body_fields)}"
-            )
-            for result in results
-        )
+        context_chunks: list[str] = []
+        for result in results:
+            label = _result_label(result, rag.label_fields)
+            chunk = f"**{_result_title(result, rag.title_fields)}**"
+            if label:
+                chunk += f" ({label})"
+            chunk += f":\n{_result_body(result, rag.body_fields)}"
+            context_chunks.append(chunk)
+        context_text = "\n\n".join(context_chunks)
         system_prompt = f"{rag.answer_system_prompt}\n\n--- DOMAIN DOCUMENTS ---\n{context_text}\n--- END ---"
         try:
             stream = await self.openai.chat.completions.create(

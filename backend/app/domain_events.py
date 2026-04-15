@@ -90,7 +90,14 @@ def _decode_domain_event(event_id: str, raw_fields: dict[str, Any]) -> dict[str,
     elif payload_raw is None:
         event["payload"] = {}
     event["stream_id"] = event_id
-    event["importance_score"] = event.get("importance_score")
+    importance_raw = event.get("importance_score")
+    if importance_raw in (None, ""):
+        event["importance_score"] = None
+    else:
+        try:
+            event["importance_score"] = float(importance_raw)
+        except (TypeError, ValueError):
+            event["importance_score"] = importance_raw
     return event
 
 
@@ -108,12 +115,19 @@ def _redis_stream_id_is_older_or_equal(left: str, right: str) -> bool:
         return True
 
     try:
-        left_ms, left_seq = (int(part) for part in left.split("-", 1))
-        right_ms, right_seq = (int(part) for part in right.split("-", 1))
+        left_ms, left_seq = _parse_redis_stream_id(left)
+        right_ms, right_seq = _parse_redis_stream_id(right)
     except ValueError:
         return False
 
     return (left_ms, left_seq) <= (right_ms, right_seq)
+
+
+def _parse_redis_stream_id(value: str) -> tuple[int, int]:
+    if "-" not in value:
+        return int(value), 0
+    ms_raw, seq_raw = value.split("-", 1)
+    return int(ms_raw), int(seq_raw)
 
 
 async def stream_domain_events(
