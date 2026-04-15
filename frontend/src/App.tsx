@@ -902,6 +902,7 @@ export default function App() {
               <div className="hero-panel">
                 <div className="hero-mark"><BrandLogo src={domain?.logo_src} className="hero-logo" /></div>
                 <h1 className="hero-title">{domain?.hero_title ?? "How can we help?"}</h1>
+                {domain?.subtitle && <div className="hero-tagline">{domain.subtitle}</div>}
               </div>
             )}
 

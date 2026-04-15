@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ShiftIQ Engineering Brief</title>
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@5/dist/reveal.css" />
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@5/dist/theme/black.css" />
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@5/plugin/highlight/monokai.css" />
+    <style>
+      :root {
+        --bg: #081018;
+        --bg-2: #0c1828;
+        --panel: rgba(12, 20, 31, 0.92);
+        --panel-2: rgba(14, 26, 40, 0.96);
+        --line: rgba(111, 211, 255, 0.16);
+        --line-strong: rgba(111, 211, 255, 0.28);
+        --text: #eef4fb;
+        --muted: #9fb0c2;
+        --soft: #d2deeb;
+        --redis: #dc382d;
+        --redis-soft: rgba(220, 56, 45, 0.14);
+        --blue: #6fd3ff;
+        --blue-soft: rgba(111, 211, 255, 0.14);
+        --green: #57e2a6;
+        --green-soft: rgba(87, 226, 166, 0.12);
+        --yellow: #ffd166;
+      }
+
+      .reveal {
+        font-family: "Manrope", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(39, 145, 255, 0.16), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(87, 226, 166, 0.12), transparent 24%),
+          linear-gradient(180deg, var(--bg), var(--bg-2));
+      }
+
+      .reveal h1,
+      .reveal h2,
+      .reveal h3 {
+        text-transform: none;
+        letter-spacing: -0.03em;
+      }
+
+      .reveal h1 {
+        font-size: 2.35em;
+        margin: 0 0 0.18em;
+      }
+
+      .reveal h2 {
+        font-size: 1.55em;
+        margin: 0 0 0.3em;
+      }
+
+      .reveal h3 {
+        font-size: 0.82em;
+        margin: 0 0 0.45em;
+      }
+
+      .reveal p,
+      .reveal li,
+      .reveal td,
+      .reveal th {
+        font-size: 0.78em;
+        line-height: 1.45;
+        color: var(--soft);
+      }
+
+      .eyebrow {
+        color: var(--blue);
+        font-size: 0.45em;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 1em;
+      }
+
+      .hero,
+      .left {
+        text-align: left;
+      }
+
+      .hero-grid,
+      .two-col,
+      .three-col,
+      .logo-row,
+      .quad {
+        display: grid;
+        gap: 24px;
+      }
+
+      .hero-grid {
+        grid-template-columns: 1.3fr 1fr;
+        align-items: center;
+      }
+
+      .two-col {
+        grid-template-columns: 1.06fr 0.94fr;
+        align-items: start;
+      }
+
+      .three-col {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .quad {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .logo-row {
+        grid-template-columns: auto auto;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .card {
+        background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 22px;
+        padding: 22px 24px;
+        text-align: left;
+        box-shadow: 0 18px 50px rgba(0,0,0,0.26);
+      }
+
+      .card.redis {
+        border-color: rgba(220,56,45,0.32);
+        background: linear-gradient(180deg, rgba(220,56,45,0.11), rgba(255,255,255,0.015));
+      }
+
+      .card.blue {
+        border-color: rgba(111,211,255,0.28);
+      }
+
+      .card.green {
+        border-color: rgba(87,226,166,0.26);
+        background: linear-gradient(180deg, rgba(87,226,166,0.10), rgba(255,255,255,0.015));
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .pill {
+        border-radius: 999px;
+        padding: 7px 12px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: rgba(255,255,255,0.04);
+        color: var(--muted);
+        font-size: 0.36em;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .pill.redis { background: var(--redis-soft); color: #ffd5d2; border-color: rgba(220,56,45,0.38); }
+      .pill.blue { background: var(--blue-soft); color: #d8efff; border-color: rgba(111,211,255,0.34); }
+      .pill.green { background: var(--green-soft); color: #ddfff6; border-color: rgba(87,226,166,0.28); }
+
+      .brand-lockup {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .brand-lockup img.logo-square {
+        width: 88px;
+        height: 88px;
+        border-radius: 24px;
+        object-fit: cover;
+        box-shadow: 0 18px 36px rgba(0,0,0,0.24);
+        background: rgba(7, 16, 24, 0.7);
+        padding: 4px;
+      }
+
+      .brand-lockup img.redis-wordmark {
+        width: 210px;
+        height: auto;
+      }
+
+      .quote {
+        font-size: 0.82em;
+        line-height: 1.5;
+        color: var(--text);
+      }
+
+      .callout {
+        font-size: 0.82em;
+        line-height: 1.45;
+        color: var(--text);
+      }
+
+      .reveal ul.flat {
+        list-style: none;
+        padding-left: 0;
+        margin-left: 0;
+      }
+
+      .reveal ul.flat li {
+        margin: 0.42em 0;
+      }
+
+      .demo-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        margin: 12px 0;
+      }
+
+      .num {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        background: rgba(111,211,255,0.14);
+        color: #d8efff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 0.48em;
+        flex: 0 0 auto;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 0.56em;
+      }
+
+      .flow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 0.56em;
+        color: var(--muted);
+      }
+
+      .flow .node {
+        padding: 10px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.03);
+      }
+
+      .flow .arrow {
+        color: var(--blue);
+        font-weight: 800;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      .layer {
+        border-radius: 18px;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.025);
+      }
+
+      .layer strong {
+        color: var(--text);
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .metric {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .metric strong {
+        font-size: 1.7em;
+        line-height: 1;
+        color: var(--text);
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 0.6em;
+      }
+
+      .reveal pre {
+        width: 100%;
+        margin: 0.7em 0 0;
+        box-shadow: none;
+      }
+
+      .reveal pre code {
+        max-height: 440px;
+        padding: 18px;
+        border-radius: 18px;
+        background: #08111b;
+        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+        font-size: 0.45em;
+        line-height: 1.42;
+      }
+
+      .reveal :not(pre) > code {
+        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+        font-size: 0.82em;
+        color: #ffd9b8;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 0.12em 0.36em;
+      }
+
+      .reveal table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.55em;
+      }
+
+      .reveal th,
+      .reveal td {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        text-align: left;
+      }
+
+      .reveal th {
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section class="hero">
+          <div class="eyebrow">ShiftIQ • Redis + LangGraph Engineering Brief</div>
+          <div class="hero-grid">
+            <div>
+              <div class="brand-lockup">
+                <img class="logo-square" src="assets/shiftiq-logo.svg" alt="ShiftIQ logo" />
+                <img class="redis-wordmark" src="assets/redis-logo.png" alt="Redis logo" />
+              </div>
+              <h1>Where Redis Helps<br />When You Already Use LangGraph</h1>
+              <p class="quote">
+                ShiftIQ is a finance research demo that shows how Redis can become the
+                operational data plane under an existing LangGraph agent stack, instead
+                of just another vector store sitting beside it.
+              </p>
+              <div class="pill-row">
+                <span class="pill blue">Context Surfaces</span>
+                <span class="pill green">RedisTimeSeries</span>
+                <span class="pill redis">Redis Streams</span>
+              </div>
+            </div>
+            <div class="card redis">
+              <h3>The buyer question</h3>
+              <p class="quote">
+                “We are using LangGraph today to orchestrate agents. Where and how can Redis help, if at all?”
+              </p>
+              <ul class="flat">
+                <li>Durable agent memory with the Redis LangGraph checkpointer</li>
+                <li>A structured tool plane over live operational data with Context Surfaces</li>
+                <li>Real-time time-series and event data in the same platform</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Executive Answer</div>
+          <h2>Redis Helps In Three Places LangGraph Alone Does Not Solve</h2>
+          <div class="three-col">
+            <div class="card blue">
+              <h3>1. Tool plane</h3>
+              <ul class="flat">
+                <li>Context Surfaces turns Redis-backed business models into MCP tools.</li>
+                <li>No hand-built API wrapper per entity, filter, or search path.</li>
+                <li>The agent sees live tools, not prompt-described hopes.</li>
+              </ul>
+            </div>
+            <div class="card green">
+              <h3>2. Data plane</h3>
+              <ul class="flat">
+                <li>RedisTimeSeries serves price and metric trends directly.</li>
+                <li>Redis Streams delivers live watchlist updates and event replay.</li>
+                <li>The same app can reason over records, series, and events together.</li>
+              </ul>
+            </div>
+            <div class="card redis">
+              <h3>3. Memory plane</h3>
+              <ul class="flat">
+                <li><code>langgraph-checkpoint-redis</code> persists graph state in Redis.</li>
+                <li>Threads survive beyond the browser tab.</li>
+                <li>Planning/tool history becomes durable and inspectable.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Architecture</div>
+          <h2>ShiftIQ Uses Redis As The Agent Runtime Substrate</h2>
+          <div class="card">
+            <div class="flow">
+              <span class="node">React UI</span>
+              <span class="arrow">→</span>
+              <span class="node">FastAPI SSE</span>
+              <span class="arrow">→</span>
+              <span class="node">LangGraph ReAct Agent</span>
+              <span class="arrow">→</span>
+              <span class="node">Internal Tools</span>
+              <span class="arrow">+</span>
+              <span class="node">Context Surfaces MCP Tools</span>
+              <span class="arrow">→</span>
+              <span class="node">Redis JSON + Search</span>
+              <span class="arrow">+</span>
+              <span class="node">RedisTimeSeries</span>
+              <span class="arrow">+</span>
+              <span class="node">Redis Streams</span>
+              <span class="arrow">+</span>
+              <span class="node">Redis Checkpointer</span>
+            </div>
+          </div>
+          <div class="three-col" style="margin-top: 18px;">
+            <div class="card">
+              <h3>Question types</h3>
+              <ul class="flat">
+                <li>Company and document lookup</li>
+                <li>Cross-watchlist comparisons</li>
+                <li>Live “what changed?” monitoring</li>
+              </ul>
+            </div>
+            <div class="card blue">
+              <h3>What LangGraph does</h3>
+              <ul class="flat">
+                <li>Plan</li>
+                <li>Call tools</li>
+                <li>Review results</li>
+                <li>Stream answers</li>
+              </ul>
+            </div>
+            <div class="card redis">
+              <h3>What Redis contributes</h3>
+              <ul class="flat">
+                <li>Live structured data</li>
+                <li>Searchable tool surface</li>
+                <li>Series + events + memory</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Context Surfaces</div>
+          <h2>Redis Context Surfaces Removes The Custom Tool-Glue Tax</h2>
+          <div class="two-col">
+            <div class="card">
+              <pre><code class="language-python">class ResearchChunk(ContextModel):
+    __redis_key_template__ = "finance_researcher_research_chunk:{chunk_id}"
+
+    chunk_id: str = ContextField(
+        description="Unique research chunk identifier",
+        is_key_component=True,
+    )
+    company_id: str = ContextField(
+        description="Company foreign key",
+        index="tag",
+    )
+    ticker: str = ContextField(
+        description="Ticker symbol",
+        index="tag",
+        no_stem=True,
+    )
+    section_heading: str = ContextField(
+        description="Heading from filing, deck, or release",
+        index="text",
+    )
+    chunk_text: str = ContextField(
+        description="Narrative evidence used by the assistant",
+        index="text",
+        weight=1.8,
+    )</code></pre>
+            </div>
+            <div class="card blue">
+              <h3>What that becomes</h3>
+              <ul class="flat">
+                <li><code>search_researchchunk_by_text</code></li>
+                <li><code>filter_researchchunk_by_ticker</code></li>
+                <li><code>filter_researchchunk_by_document_id</code></li>
+                <li><code>search_researchchunk_by_content_embedding_similarity</code></li>
+              </ul>
+              <p class="callout">
+                LangGraph still does the orchestration. Redis Context Surfaces gives it a
+                structured, typed, domain-scoped tool surface over live Redis data.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">LangGraph Integration</div>
+          <h2>The Agent Pulls Redis Tools In At Runtime</h2>
+          <div class="two-col">
+            <div class="card blue">
+              <pre><code class="language-python">async def create_agent(settings, internal_tools, cs_service, checkpointer=None):
+    model = ChatOpenAI(
+        model=settings.openai_chat_model,
+        temperature=0.2,
+        api_key=settings.openai_api_key,
+    )
+
+    tools = _make_internal_tools(internal_tools)
+    mcp_defs = await cs_service.list_tools()
+    mcp_tools = [_make_mcp_tool(t, cs_service) for t in mcp_defs]
+    tools.extend(mcp_tools)
+
+    return create_react_agent(
+        model,
+        tools,
+        prompt=prompt,
+        checkpointer=checkpointer,
+    )</code></pre>
+            </div>
+            <div class="card">
+              <pre><code class="language-python">async def list_tools(self) -> list[dict[str, Any]]:
+    async with UnifiedClient() as client:
+        tools = await client.list_tools(self.settings.mcp_agent_key)
+    return [t if isinstance(t, dict) else t.model_dump() for t in tools]
+
+
+async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    async with UnifiedClient() as client:
+        result = await client.query_tool(
+            agent_key=self.settings.mcp_agent_key,
+            tool_name=tool_name,
+            arguments=arguments,
+        )
+    return _normalize_tool_result_payload(result)</code></pre>
+              <p class="small">
+                The tool inventory is not hardwired in the prompt. The app discovers it from the active Context Surface.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">RedisTimeSeries</div>
+          <h2>ShiftIQ Uses RedisTimeSeries For Fast, Transparent Trend Queries</h2>
+          <div class="two-col">
+            <div class="card green">
+              <pre><code class="language-python">InternalToolDefinition(
+    name="query_finance_timeseries",
+    description=(
+        "Query RedisTimeSeries for one or more finance watchlist tickers "
+        "and return the exact TS.RANGE commands, sampled results, "
+        "and chart-ready trend data."
+    ),
+)</code></pre>
+              <pre><code class="language-python">redis_command = f"TS.RANGE {metadata['key']} {from_ts} {to_ts}"
+raw_points = client.execute_command(
+    "TS.RANGE",
+    metadata["key"],
+    from_ts,
+    to_ts,
+)</code></pre>
+            </div>
+            <div class="card">
+              <h3>Why this matters for engineering</h3>
+              <ul class="flat">
+                <li>The agent is not fabricating chart data from document text.</li>
+                <li>The UI shows the exact Redis command used.</li>
+                <li>The response can render the chart and still expose raw Redis results.</li>
+              </ul>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Series</th>
+                    <th>Redis key shape</th>
+                    <th>Query</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Price</td>
+                    <td><code>finance-researcher:ts:price:nvda:close</code></td>
+                    <td><code>TS.RANGE ...</code></td>
+                  </tr>
+                  <tr>
+                    <td>Fundamentals</td>
+                    <td><code>finance-researcher:ts:metric:mdb:revenue:quarter</code></td>
+                    <td><code>TS.RANGE ...</code></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Redis Streams</div>
+          <h2>Redis Streams Gives The Agent A Live Event Feed, Not Just Historical State</h2>
+          <div class="two-col">
+            <div class="card redis">
+              <pre><code class="language-python">def publish_domain_event(settings, domain, event):
+    client = create_redis_client(settings)
+    return str(client.xadd(domain_event_stream_key(domain), _encode_domain_event(event)))
+
+
+async def stream_domain_events(settings, domain, *, cursor="$", history_limit=12):
+    client = create_async_redis_client(settings)
+    stream_key = domain_event_stream_key(domain)
+    ...
+    messages = await client.xread({stream_key: last_id}, block=15000, count=50)</code></pre>
+            </div>
+            <div class="card">
+              <h3>What it enables</h3>
+              <ul class="flat">
+                <li>Coverage updates arriving after the page has loaded</li>
+                <li>Replay of recent events on connect, then tailing live ones</li>
+                <li>A clean separation between document retrieval and event monitoring</li>
+              </ul>
+              <div class="pill-row">
+                <span class="pill redis">XADD</span>
+                <span class="pill blue">XREVRANGE replay</span>
+                <span class="pill green">XREAD live tail</span>
+              </div>
+              <p class="small">
+                The stream key in the finance demo is <code>finance-researcher:stream:events</code>.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Redis For LangGraph</div>
+          <h2>LangGraph State Lives In Redis With The Official Checkpointer Extension</h2>
+          <div class="two-col">
+            <div class="card blue">
+              <pre><code class="language-python">from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+
+
+async def create_checkpointer(settings: Settings) -> AsyncRedisSaver:
+    redis_url = build_redis_url(settings)
+    domain = get_active_domain(settings)
+    checkpointer = AsyncRedisSaver(
+        redis_url=redis_url,
+        checkpoint_prefix=domain.manifest.namespace.checkpoint_prefix,
+        checkpoint_write_prefix=domain.manifest.namespace.checkpoint_write_prefix,
+    )
+    await checkpointer.asetup()
+    return checkpointer</code></pre>
+            </div>
+            <div class="card">
+              <h3>Answer to “where does Redis help LangGraph?”</h3>
+              <ul class="flat">
+                <li>Checkpointing is the obvious first step if you already use LangGraph.</li>
+                <li>It gives you durable thread state without inventing your own persistence layer.</li>
+                <li>Once Redis is already in the loop, Context Surfaces, TimeSeries, and Streams extend that same platform into tool/data planes.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">What Changes In Practice</div>
+          <h2>From Hand-Rolled Agent Plumbing To A Redis-Centered Runtime</h2>
+          <div class="card">
+            <table>
+              <thead>
+                <tr>
+                  <th>If you only use LangGraph</th>
+                  <th>What Redis adds</th>
+                  <th>Why the head of engineering should care</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>You still need tool adapters and data contracts.</td>
+                  <td>Context Surfaces generates the operational tool plane from the model.</td>
+                  <td>Less custom glue and less drift as the domain grows.</td>
+                </tr>
+                <tr>
+                  <td>Time-series answers are usually bolted on or precomputed.</td>
+                  <td>RedisTimeSeries gives direct queryable trend data.</td>
+                  <td>Lower latency, more transparency, better UX for chart-heavy workflows.</td>
+                </tr>
+                <tr>
+                  <td>Live events need separate infra and UI wiring.</td>
+                  <td>Redis Streams gives replay plus live tail in one primitive.</td>
+                  <td>Agents can react to updates, not only search stale context.</td>
+                </tr>
+                <tr>
+                  <td>State durability is another integration problem.</td>
+                  <td><code>langgraph-checkpoint-redis</code> handles it natively.</td>
+                  <td>Production path gets simpler, not more fragmented.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="left">
+          <div class="eyebrow">Adoption Path</div>
+          <h2>If They Already Have LangGraph, Start Here</h2>
+          <div class="three-col">
+            <div class="card blue">
+              <div class="metric">
+                <strong>Phase 1</strong>
+                <span>Adopt Redis checkpointer for durable graph state</span>
+              </div>
+            </div>
+            <div class="card green">
+              <div class="metric">
+                <strong>Phase 2</strong>
+                <span>Expose structured Redis data as Context Surfaces tools</span>
+              </div>
+            </div>
+            <div class="card redis">
+              <div class="metric">
+                <strong>Phase 3</strong>
+                <span>Add RedisTimeSeries and Redis Streams for trends and live updates</span>
+              </div>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="layer"><strong>Low-risk entry</strong> Start where LangGraph already expects infrastructure help: checkpoint persistence.</div>
+            <div class="layer"><strong>Highest leverage next step</strong> Stop building one-off adapters for every entity and turn models into live tools.</div>
+            <div class="layer"><strong>Differentiated experience</strong> Use TimeSeries and Streams to show answers grounded in live operational data, not only retrieved text.</div>
+          </div>
+        </section>
+
+        <section class="hero">
+          <div class="eyebrow">Takeaway</div>
+          <div class="hero-grid">
+            <div>
+              <h1>Redis is not replacing LangGraph here.<br />It is making LangGraph operational.</h1>
+              <div class="pill-row">
+                <span class="pill blue">Tool plane</span>
+                <span class="pill green">Data plane</span>
+                <span class="pill redis">Memory plane</span>
+              </div>
+            </div>
+            <div class="card redis">
+              <ul class="flat">
+                <li>LangGraph stays the orchestration layer.</li>
+                <li>Redis becomes the platform underneath: state, tools, series, and live events.</li>
+                <li>ShiftIQ is the proof point that all of that can show up in one engineering-ready app.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/reveal.js@5/dist/reveal.js"></script>
+    <script src="https://unpkg.com/reveal.js@5/plugin/highlight/highlight.js"></script>
+    <script>
+      Reveal.initialize({
+        hash: true,
+        controls: true,
+        progress: true,
+        transition: "fade",
+        slideNumber: true,
+        width: 1440,
+        height: 900,
+        margin: 0.06,
+        plugins: [RevealHighlight],
+      });
+    </script>
+  </body>
+</html>

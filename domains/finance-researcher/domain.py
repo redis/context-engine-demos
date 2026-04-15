@@ -335,9 +335,9 @@ class FinanceResearcherDomain:
         generated_models_path="domains/finance-researcher/generated_models.py",
         output_dir="output/finance-researcher",
         branding=BrandingConfig(
-            app_name="Finance Researcher",
-            subtitle="Watchlist Research",
-            hero_title="Track what moved, why it moved, and what matters next.",
+            app_name="ShiftIQ",
+            subtitle="Market shifts, made clear.",
+            hero_title="ShiftIQ",
             placeholder_text="Compare companies, documents, metrics, or recent events...",
             logo_path="domains/finance-researcher/assets/logo.svg",
             starter_prompts=[

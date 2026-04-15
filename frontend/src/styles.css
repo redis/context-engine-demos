@@ -65,6 +65,14 @@ button { cursor: pointer; }
 .hero-mark { width: 80px; height: 80px; border-radius: 24px; display: grid; place-items: center; background: linear-gradient(180deg, rgba(255,68,56,0.18), rgba(255,140,66,0.08)); border: 1px solid rgba(255,255,255,0.08); box-shadow: var(--shadow); }
 .hero-logo { width: 52px; height: 52px; border-radius: 14px; display: inline-flex; overflow: hidden; }
 .hero-title { margin: 0; max-width: 720px; font-size: clamp(2.4rem, 4.5vw, 3.8rem); line-height: 0.95; font-weight: 800; letter-spacing: -0.055em; }
+.hero-tagline {
+  margin: 0;
+  max-width: 560px;
+  color: var(--muted);
+  font-size: clamp(0.95rem, 1.8vw, 1.15rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
 
 .platform-panel {
   width: min(860px, 100%);
