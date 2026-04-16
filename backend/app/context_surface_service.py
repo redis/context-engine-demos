@@ -8,6 +8,65 @@ from context_surfaces import UnifiedClient
 from backend.app.settings import Settings
 
 
+def _default_array_items_schema(*, field_name: str | None = None, schema: dict[str, Any] | None = None) -> dict[str, Any]:
+    description = ""
+    if isinstance(schema, dict):
+        description = str(schema.get("description", ""))
+    hint = " ".join(part for part in (field_name or "", description) if part).lower()
+    if any(token in hint for token in ("embedding", "vector")):
+        return {"type": "number"}
+    return {}
+
+
+def _sanitize_json_schema(
+    schema: Any,
+    *,
+    field_name: str | None = None,
+) -> Any:
+    if isinstance(schema, list):
+        return [_sanitize_json_schema(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+
+    sanitized = {key: value for key, value in schema.items()}
+
+    if sanitized.get("type") == "array":
+        items = sanitized.get("items")
+        if items is None:
+            sanitized["items"] = _default_array_items_schema(field_name=field_name, schema=sanitized)
+        else:
+            sanitized["items"] = _sanitize_json_schema(items, field_name=field_name)
+
+    properties = sanitized.get("properties")
+    if isinstance(properties, dict):
+        sanitized["properties"] = {
+            name: _sanitize_json_schema(prop_schema, field_name=name)
+            for name, prop_schema in properties.items()
+        }
+
+    additional_properties = sanitized.get("additionalProperties")
+    if isinstance(additional_properties, (dict, list)):
+        sanitized["additionalProperties"] = _sanitize_json_schema(additional_properties)
+
+    for key in ("allOf", "anyOf", "oneOf", "prefixItems"):
+        value = sanitized.get(key)
+        if isinstance(value, list):
+            sanitized[key] = [_sanitize_json_schema(item) for item in value]
+
+    if isinstance(sanitized.get("not"), dict):
+        sanitized["not"] = _sanitize_json_schema(sanitized["not"])
+
+    return sanitized
+
+
+def _sanitize_tool_definition(tool_def: dict[str, Any]) -> dict[str, Any]:
+    sanitized = dict(tool_def)
+    input_schema = sanitized.get("inputSchema")
+    if isinstance(input_schema, dict):
+        sanitized["inputSchema"] = _sanitize_json_schema(input_schema)
+    return sanitized
+
+
 def _extract_wrapped_content_text(raw: str) -> str | None:
     start_marker = "content='"
     start = raw.find(start_marker)
@@ -101,7 +160,10 @@ class ContextSurfaceService:
             return self._tool_cache
         async with UnifiedClient() as client:
             tools = await client.list_tools(self.settings.mcp_agent_key)
-        self._tool_cache = [t if isinstance(t, dict) else t.model_dump() for t in tools]
+        self._tool_cache = [
+            _sanitize_tool_definition(t if isinstance(t, dict) else t.model_dump())
+            for t in tools
+        ]
         return self._tool_cache or []
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:

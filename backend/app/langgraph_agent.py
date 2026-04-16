@@ -226,13 +226,31 @@ JSON_TYPE_MAP: dict[str, type] = {
 }
 
 
+def _python_type_from_json_schema(schema: dict[str, Any]) -> Any:
+    schema_type = schema.get("type")
+
+    if schema_type == "array":
+        items = schema.get("items")
+        if isinstance(items, dict):
+            return list[_python_type_from_json_schema(items)]
+        return list[Any]
+
+    if schema_type == "object":
+        additional_properties = schema.get("additionalProperties")
+        if isinstance(additional_properties, dict):
+            return dict[str, _python_type_from_json_schema(additional_properties)]
+        return dict[str, Any]
+
+    return JSON_TYPE_MAP.get(str(schema_type), Any)
+
+
 def _pydantic_model_from_json_schema(name: str, schema: dict) -> type[BaseModel]:
     """Build a Pydantic model from a JSON Schema ``properties`` dict."""
     props = schema.get("properties", {})
     required = set(schema.get("required", []))
     fields: dict[str, Any] = {}
     for prop_name, prop_def in props.items():
-        py_type = JSON_TYPE_MAP.get(prop_def.get("type", "string"), str)
+        py_type = _python_type_from_json_schema(prop_def)
         desc = prop_def.get("description", "")
         if prop_name in required:
             fields[prop_name] = (py_type, Field(description=desc))
