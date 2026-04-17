@@ -51,10 +51,15 @@ def _sanitize_json_schema(
     for key in ("allOf", "anyOf", "oneOf", "prefixItems"):
         value = sanitized.get(key)
         if isinstance(value, list):
-            sanitized[key] = [_sanitize_json_schema(item) for item in value]
+            sanitized[key] = [
+                _sanitize_json_schema(item, field_name=field_name) for item in value
+            ]
 
     if isinstance(sanitized.get("not"), dict):
-        sanitized["not"] = _sanitize_json_schema(sanitized["not"])
+        sanitized["not"] = _sanitize_json_schema(
+            sanitized["not"],
+            field_name=field_name,
+        )
 
     return sanitized
 
