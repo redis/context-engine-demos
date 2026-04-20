@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import warnings
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from langchain_core.tools import StructuredTool
 from langchain_openai import ChatOpenAI
@@ -226,22 +226,79 @@ JSON_TYPE_MAP: dict[str, type] = {
 }
 
 
-def _python_type_from_json_schema(schema: dict[str, Any]) -> Any:
+def _resolve_json_schema_variant(schema: dict[str, Any] | None) -> tuple[dict[str, Any], bool]:
+    if not isinstance(schema, dict):
+        return {"type": "string"}, False
+
+    nullable = False
     schema_type = schema.get("type")
+    if isinstance(schema_type, list):
+        non_null_types = [value for value in schema_type if value != "null"]
+        nullable = len(non_null_types) != len(schema_type)
+        if len(non_null_types) == 1:
+            resolved = dict(schema)
+            resolved["type"] = non_null_types[0]
+            return resolved, nullable
+
+    for key in ("anyOf", "oneOf"):
+        variants = schema.get(key)
+        if isinstance(variants, list) and variants:
+            non_null_variants = [variant for variant in variants if variant != {"type": "null"}]
+            nullable = len(non_null_variants) != len(variants)
+            if len(non_null_variants) == 1:
+                resolved_variant, variant_nullable = _resolve_json_schema_variant(non_null_variants[0])
+                return resolved_variant, nullable or variant_nullable
+
+    all_of = schema.get("allOf")
+    if isinstance(all_of, list) and all_of:
+        merged: dict[str, Any] = {}
+        required: list[str] = []
+        for variant in all_of:
+            resolved_variant, variant_nullable = _resolve_json_schema_variant(variant)
+            nullable = nullable or variant_nullable
+            if resolved_variant.get("type") and not merged.get("type"):
+                merged["type"] = resolved_variant["type"]
+            if isinstance(resolved_variant.get("properties"), dict):
+                merged.setdefault("properties", {}).update(resolved_variant["properties"])
+            if isinstance(resolved_variant.get("required"), list):
+                for field_name in resolved_variant["required"]:
+                    if field_name not in required:
+                        required.append(field_name)
+            if isinstance(resolved_variant.get("additionalProperties"), dict):
+                merged["additionalProperties"] = resolved_variant["additionalProperties"]
+            for key, value in resolved_variant.items():
+                if key not in {"type", "properties", "required", "additionalProperties"} and key not in merged:
+                    merged[key] = value
+        if required:
+            merged["required"] = required
+        if merged:
+            return merged, nullable
+
+    return schema, nullable
+
+
+def _python_type_from_json_schema(schema: dict[str, Any], name: str = "Nested") -> tuple[Any, bool]:
+    resolved_schema, nullable = _resolve_json_schema_variant(schema)
+    schema_type = resolved_schema.get("type")
 
     if schema_type == "array":
-        items = schema.get("items")
+        items = resolved_schema.get("items")
         if isinstance(items, dict):
-            return list[_python_type_from_json_schema(items)]
-        return list[Any]
+            item_type, _ = _python_type_from_json_schema(items, f"{name}Item")
+            return list[item_type], nullable
+        return list[Any], nullable
 
     if schema_type == "object":
-        additional_properties = schema.get("additionalProperties")
+        properties = resolved_schema.get("properties")
+        if isinstance(properties, dict):
+            return _pydantic_model_from_json_schema(name, resolved_schema), nullable
+        additional_properties = resolved_schema.get("additionalProperties")
         if isinstance(additional_properties, dict):
-            return dict[str, _python_type_from_json_schema(additional_properties)]
-        return dict[str, Any]
+            value_type, _ = _python_type_from_json_schema(additional_properties, f"{name}Value")
+            return dict[str, value_type], nullable
+        return dict[str, Any], nullable
 
-    return JSON_TYPE_MAP.get(str(schema_type), Any)
+    return JSON_TYPE_MAP.get(str(schema_type), Any), nullable
 
 
 def _pydantic_model_from_json_schema(name: str, schema: dict) -> type[BaseModel]:
@@ -250,13 +307,17 @@ def _pydantic_model_from_json_schema(name: str, schema: dict) -> type[BaseModel]
     required = set(schema.get("required", []))
     fields: dict[str, Any] = {}
     for prop_name, prop_def in props.items():
-        py_type = _python_type_from_json_schema(prop_def)
+        py_type, nullable = _python_type_from_json_schema(prop_def, f"{name}_{prop_name}")
         desc = prop_def.get("description", "")
+        field_type = py_type | None if nullable or prop_name not in required else py_type
         if prop_name in required:
-            fields[prop_name] = (py_type, Field(description=desc))
+            fields[prop_name] = (field_type, Field(description=desc))
         else:
             default = prop_def.get("default")
-            fields[prop_name] = (Optional[py_type], Field(default=default, description=desc))
+            if default is None:
+                fields[prop_name] = (field_type, Field(default=None, description=desc))
+            else:
+                fields[prop_name] = (field_type, Field(default=default, description=desc))
     return create_model(f"Schema_{name}", **fields)
 
 
