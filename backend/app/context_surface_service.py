@@ -1,52 +1,11 @@
 from __future__ import annotations
 
-import copy
 import json
 from typing import Any
 
 from context_surfaces import UnifiedClient
 
 from backend.app.settings import Settings
-
-
-def _sanitize_property_schema(prop: dict[str, Any]) -> dict[str, Any]:
-    """Ensure JSON Schema arrays used as embedding vectors declare ``items``."""
-    if "anyOf" in prop:
-        new_prop = dict(prop)
-        variants: list[Any] = []
-        for variant in prop["anyOf"]:
-            if (
-                isinstance(variant, dict)
-                and variant.get("type") == "array"
-                and "items" not in variant
-            ):
-                filled = dict(variant)
-                filled["items"] = {"type": "number"}
-                variants.append(filled)
-            else:
-                variants.append(variant)
-        new_prop["anyOf"] = variants
-        return new_prop
-    if prop.get("type") == "array" and "items" not in prop:
-        new_prop = dict(prop)
-        new_prop["items"] = {"type": "number"}
-        return new_prop
-    return prop
-
-
-def _sanitize_tool_definition(tool_def: dict[str, Any]) -> dict[str, Any]:
-    """Return a copy of ``tool_def`` with missing array ``items`` filled for vector params."""
-    out = copy.deepcopy(tool_def)
-    input_schema = out.get("inputSchema")
-    if not isinstance(input_schema, dict):
-        return out
-    props = input_schema.get("properties")
-    if not isinstance(props, dict):
-        return out
-    for key, prop in list(props.items()):
-        if isinstance(prop, dict):
-            props[key] = _sanitize_property_schema(prop)
-    return out
 
 
 def _extract_wrapped_content_text(raw: str) -> str | None:
