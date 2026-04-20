@@ -226,14 +226,54 @@ JSON_TYPE_MAP: dict[str, type] = {
 }
 
 
+def _resolve_json_schema_variant(schema: dict[str, Any]) -> dict[str, Any]:
+    schema_type = schema.get("type")
+    if isinstance(schema_type, list):
+        non_null_types = [value for value in schema_type if value != "null"]
+        if len(non_null_types) == 1:
+            resolved = dict(schema)
+            resolved["type"] = non_null_types[0]
+            return resolved
+
+    for key in ("anyOf", "oneOf", "allOf"):
+        variants = schema.get(key)
+        if not isinstance(variants, list):
+            continue
+        for variant in variants:
+            if isinstance(variant, dict) and variant.get("type") != "null":
+                return _resolve_json_schema_variant(variant)
+
+    return schema
+
+
+def _python_type_from_json_schema(schema: dict[str, Any]) -> Any:
+    resolved_schema = _resolve_json_schema_variant(schema)
+    schema_type = resolved_schema.get("type")
+
+    if schema_type == "array":
+        items = resolved_schema.get("items")
+        if isinstance(items, dict):
+            return list[_python_type_from_json_schema(items)]
+        return list[Any]
+
+    if schema_type == "object":
+        additional_properties = resolved_schema.get("additionalProperties")
+        if isinstance(additional_properties, dict):
+            return dict[str, _python_type_from_json_schema(additional_properties)]
+        return dict[str, Any]
+
+    return JSON_TYPE_MAP.get(str(schema_type), Any)
+
+
 def _pydantic_model_from_json_schema(name: str, schema: dict) -> type[BaseModel]:
     """Build a Pydantic model from a JSON Schema ``properties`` dict."""
     props = schema.get("properties", {})
     required = set(schema.get("required", []))
     fields: dict[str, Any] = {}
     for prop_name, prop_def in props.items():
-        py_type = JSON_TYPE_MAP.get(prop_def.get("type", "string"), str)
-        desc = prop_def.get("description", "")
+        resolved_prop = _resolve_json_schema_variant(prop_def)
+        py_type = _python_type_from_json_schema(prop_def)
+        desc = resolved_prop.get("description", "")
         if prop_name in required:
             fields[prop_name] = (py_type, Field(description=desc))
         else:
