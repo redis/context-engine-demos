@@ -9,14 +9,11 @@ import json
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-from backend.app.core.domain_contract import GeneratedDataset
-
 ROOT = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT / ".env")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from backend.app.core.domain_contract import GeneratedDataset  # noqa: E402
 
 OUTPUT_DIR = ROOT / "output" / "healthcare"
 
