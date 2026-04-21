@@ -21,7 +21,7 @@ The repo currently includes built-in demo domains for:
 
 - `reddash` — food-delivery support
 - `electrohub` — electronics retail and order support
-- `healthcare` — patient success portal (appointments, referrals, providers)
+- `healthcare` — RedHealthConnect patient success portal (appointments, referrals, providers)
 
 **Two modes, same UI:**
 

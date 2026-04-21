@@ -28,7 +28,7 @@ class HealthcareDomain:
         generated_models_path="domains/healthcare/generated_models.py",
         output_dir="output/healthcare",
         branding=BrandingConfig(
-            app_name="HealthConnect",
+            app_name="RedHealthConnect",
             subtitle="Patient Success Portal",
             hero_title="How can we help you today?",
             placeholder_text="Ask about appointments, referrals, providers…",

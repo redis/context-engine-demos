@@ -1,4 +1,4 @@
-"""Generated Context Surface models for the HealthConnect domain."""
+"""Generated Context Surface models for the RedHealthConnect domain."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from context_surfaces.context_model import ContextField, ContextModel, ContextRe
 
 
 class Location(ContextModel):
-    """Location entity for the HealthConnect domain."""
+    """Location entity for the RedHealthConnect domain."""
 
     __redis_key_template__ = "healthcare_location:{id}"
 
@@ -50,7 +50,7 @@ class Location(ContextModel):
 
 
 class Provider(ContextModel):
-    """Provider entity for the HealthConnect domain."""
+    """Provider entity for the RedHealthConnect domain."""
 
     __redis_key_template__ = "healthcare_provider:{id}"
 
@@ -97,7 +97,7 @@ class Provider(ContextModel):
 
 
 class Patient(ContextModel):
-    """Patient entity for the HealthConnect domain."""
+    """Patient entity for the RedHealthConnect domain."""
 
     __redis_key_template__ = "healthcare_patient:{id}"
 
@@ -150,7 +150,7 @@ class Patient(ContextModel):
 
 
 class Appointment(ContextModel):
-    """Appointment entity for the HealthConnect domain."""
+    """Appointment entity for the RedHealthConnect domain."""
 
     __redis_key_template__ = "healthcare_appointment:{id}"
 
@@ -211,7 +211,7 @@ class Appointment(ContextModel):
 
 
 class Referral(ContextModel):
-    """Referral entity for the HealthConnect domain."""
+    """Referral entity for the RedHealthConnect domain."""
 
     __redis_key_template__ = "healthcare_referral:{id}"
 
@@ -272,7 +272,7 @@ class Referral(ContextModel):
 
 
 class Waitlist(ContextModel):
-    """Waitlist entity for the HealthConnect domain."""
+    """Waitlist entity for the RedHealthConnect domain."""
 
     __redis_key_template__ = "healthcare_waitlist:{id}"
 
