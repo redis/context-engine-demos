@@ -37,3 +37,8 @@ target-version = "py311"
 
 [tool.pytest.ini_options]
 pythonpath = [".", "backend"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

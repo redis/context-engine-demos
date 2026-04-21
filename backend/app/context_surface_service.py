@@ -18,48 +18,44 @@ def _default_array_items_schema(*, field_name: str | None = None, schema: dict[s
     return {}
 
 
-def _sanitize_json_schema(
-    schema: Any,
-    *,
-    field_name: str | None = None,
-) -> Any:
+def _sanitize_property_schema(name: str, schema: Any) -> Any:
     if isinstance(schema, list):
-        return [_sanitize_json_schema(item) for item in schema]
+        return [_sanitize_property_schema(name, item) for item in schema]
     if not isinstance(schema, dict):
         return schema
 
-    sanitized = {key: value for key, value in schema.items()}
+    sanitized = dict(schema)
+    schema_type = sanitized.get("type")
 
-    if sanitized.get("type") == "array":
+    if schema_type == "array":
         items = sanitized.get("items")
-        if items is None:
-            sanitized["items"] = _default_array_items_schema(field_name=field_name, schema=sanitized)
-        else:
-            sanitized["items"] = _sanitize_json_schema(items, field_name=field_name)
+        if isinstance(items, dict):
+            sanitized["items"] = _sanitize_property_schema(f"{name}_item", items)
+        elif items is None:
+            sanitized["items"] = _default_array_items_schema(field_name=name, schema=sanitized)
 
     properties = sanitized.get("properties")
     if isinstance(properties, dict):
         sanitized["properties"] = {
-            name: _sanitize_json_schema(prop_schema, field_name=name)
-            for name, prop_schema in properties.items()
+            prop_name: _sanitize_property_schema(prop_name, prop_schema)
+            for prop_name, prop_schema in properties.items()
         }
 
     additional_properties = sanitized.get("additionalProperties")
     if isinstance(additional_properties, (dict, list)):
-        sanitized["additionalProperties"] = _sanitize_json_schema(additional_properties)
+        sanitized["additionalProperties"] = _sanitize_property_schema(
+            f"{name}_value",
+            additional_properties,
+        )
 
     for key in ("allOf", "anyOf", "oneOf", "prefixItems"):
         value = sanitized.get(key)
         if isinstance(value, list):
-            sanitized[key] = [
-                _sanitize_json_schema(item, field_name=field_name) for item in value
-            ]
+            sanitized[key] = [_sanitize_property_schema(name, item) for item in value]
 
-    if isinstance(sanitized.get("not"), dict):
-        sanitized["not"] = _sanitize_json_schema(
-            sanitized["not"],
-            field_name=field_name,
-        )
+    negated = sanitized.get("not")
+    if isinstance(negated, dict):
+        sanitized["not"] = _sanitize_property_schema(name, negated)
 
     return sanitized
 
@@ -68,7 +64,7 @@ def _sanitize_tool_definition(tool_def: dict[str, Any]) -> dict[str, Any]:
     sanitized = dict(tool_def)
     input_schema = sanitized.get("inputSchema")
     if isinstance(input_schema, dict):
-        sanitized["inputSchema"] = _sanitize_json_schema(input_schema)
+        sanitized["inputSchema"] = _sanitize_property_schema("input", input_schema)
     return sanitized
 
 

@@ -1,78 +1,131 @@
-from backend.app.context_surface_service import _sanitize_tool_definition
-from backend.app.langgraph_agent import _pydantic_model_from_json_schema
+from __future__ import annotations
+
+import pytest
+from pydantic import ValidationError
+
+from backend.app.context_surface_service import (
+    _sanitize_property_schema,
+    _sanitize_tool_definition,
+)
+from backend.app.langgraph_agent import (
+    _pydantic_model_from_json_schema,
+    _resolve_json_schema_variant,
+)
 
 
-def test_sanitize_tool_definition_adds_array_items_for_vector_search() -> None:
+def test_sanitize_property_schema_preserves_generic_array_semantics() -> None:
+    sanitized = _sanitize_property_schema("tags", {"type": "array", "description": "Search tags"})
+
+    assert sanitized["items"] == {}
+
+
+def test_sanitize_property_schema_defaults_embedding_vectors_to_number_items() -> None:
+    sanitized = _sanitize_property_schema(
+        "content_embedding",
+        {"type": "array", "description": "Vector embedding used for similarity search"},
+    )
+
+    assert sanitized["items"] == {"type": "number"}
+
+
+def test_sanitize_tool_definition_recurses_into_nullable_array_variants() -> None:
     tool_def = {
-        "name": "search_policy_by_content_embedding_similarity",
+        "name": "search_vectors",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "embedding": {
+                    "anyOf": [
+                        {"type": "array", "description": "Embedding vector"},
+                        {"type": "null"},
+                    ]
+                }
+            },
+        },
+    }
+
+    sanitized = _sanitize_tool_definition(tool_def)
+    embedding_schema = sanitized["inputSchema"]["properties"]["embedding"]["anyOf"][0]
+
+    assert embedding_schema["items"] == {"type": "number"}
+
+
+def test_sanitize_tool_definition_defaults_plain_vector_arrays() -> None:
+    tool_def = {
+        "name": "redis__search_policy_by_content_embedding_similarity",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "vector": {
                     "type": "array",
-                    "description": "The content_embedding vector to search for",
-                },
-                "k": {
-                    "type": "number",
-                },
+                    "description": "Vector used for similarity search",
+                }
             },
             "required": ["vector"],
         },
     }
 
     sanitized = _sanitize_tool_definition(tool_def)
+    vector_schema = sanitized["inputSchema"]["properties"]["vector"]
 
-    assert sanitized["inputSchema"]["properties"]["vector"]["items"] == {"type": "number"}
-
-
-def test_pydantic_model_from_json_schema_preserves_array_inputs() -> None:
-    schema = {
-        "type": "object",
-        "properties": {
-            "vector": {
-                "type": "array",
-                "description": "Embedding values",
-                "items": {"type": "number"},
-            },
-            "tags": {
-                "type": "array",
-                "items": {"type": "string"},
-            },
-        },
-        "required": ["vector"],
-    }
-
-    model = _pydantic_model_from_json_schema("VectorSearch", schema)
-    parsed = model(vector=[0.1, 0.2], tags=["a", "b"])
-
-    assert parsed.vector == [0.1, 0.2]
-    assert parsed.tags == ["a", "b"]
+    assert vector_schema["items"] == {"type": "number"}
 
 
-def test_sanitize_tool_definition_preserves_field_name_through_composition_keywords() -> None:
-    tool_def = {
-        "name": "search_policy_by_content_embedding_similarity",
-        "inputSchema": {
+def test_resolve_json_schema_variant_handles_nullable_composed_schema() -> None:
+    resolved, nullable = _resolve_json_schema_variant(
+        {
+            "anyOf": [
+                {"type": "array", "items": {"type": "integer"}},
+                {"type": "null"},
+            ]
+        }
+    )
+
+    assert nullable is True
+    assert resolved == {"type": "array", "items": {"type": "integer"}}
+
+
+def test_pydantic_model_from_json_schema_supports_arrays_objects_and_nullable_variants() -> None:
+    model = _pydantic_model_from_json_schema(
+        "VectorSearchArgs",
+        {
             "type": "object",
             "properties": {
-                "vector": {
+                "embedding": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "Embedding vector",
+                },
+                "filters": {
                     "anyOf": [
                         {
-                            "type": "array",
-                            "description": "The content_embedding vector to search for",
+                            "type": "object",
+                            "properties": {
+                                "ids": {
+                                    "type": ["array", "null"],
+                                    "items": {"type": "integer"},
+                                }
+                            },
+                            "required": ["ids"],
                         },
-                        {
-                            "type": "null",
-                        },
+                        {"type": "null"},
                     ],
+                    "description": "Optional filter object",
                 },
             },
-            "required": ["vector"],
+            "required": ["embedding", "filters"],
         },
-    }
+    )
 
-    sanitized = _sanitize_tool_definition(tool_def)
+    instance = model(embedding=[0.1, 0.2], filters={"ids": [1, 2, 3]})
+    assert instance.embedding == [0.1, 0.2]
+    assert instance.filters.ids == [1, 2, 3]
 
-    assert sanitized["inputSchema"]["properties"]["vector"]["anyOf"][0]["items"] == {
-        "type": "number"
-    }
+    nullable_instance = model(embedding=[0.1], filters=None)
+    assert nullable_instance.filters is None
+
+    with pytest.raises(ValidationError):
+        model(embedding=["bad"], filters={"ids": [1]})
+
+    with pytest.raises(ValidationError):
+        model(embedding=[0.1])
