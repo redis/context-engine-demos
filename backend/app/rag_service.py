@@ -11,6 +11,7 @@ from openai import AsyncOpenAI
 
 from backend.app.context_surface_service import ContextSurfaceService
 from backend.app.core.domain_loader import get_active_domain
+from backend.app.sse import format_sse_event
 from backend.app.settings import Settings
 
 
@@ -133,11 +134,11 @@ class SimpleRAGService:
         """Embed the question, search domain documents, stream a one-shot LLM answer."""
         rag = self.domain.manifest.rag
         tool_run_id = str(uuid4())
-        yield _sse("status", text="Embedding query…", ts=timer.elapsed_ms())
+        yield format_sse_event("status", text="Embedding query…", ts=timer.elapsed_ms())
         embedding = await self._embed(question)
 
-        yield _sse("status", text=rag.status_text, ts=timer.elapsed_ms())
-        yield _sse(
+        yield format_sse_event("status", text=rag.status_text, ts=timer.elapsed_ms())
+        yield format_sse_event(
             "tool-call",
             runId=tool_run_id,
             toolName=rag.tool_name,
@@ -152,7 +153,7 @@ class SimpleRAGService:
             search_duration = timer.lap_ms()
         except Exception as exc:
             search_duration = timer.lap_ms()
-            yield _sse(
+            yield format_sse_event(
                 "tool-result",
                 runId=tool_run_id,
                 toolName=rag.tool_name,
@@ -161,13 +162,13 @@ class SimpleRAGService:
                 durationMs=search_duration,
                 ts=timer.elapsed_ms(),
             )
-            yield _sse(
+            yield format_sse_event(
                 "text-delta",
                 delta="Simple RAG is not available for this domain right now because the vector search index is not ready.",
             )
             return
 
-        yield _sse(
+        yield format_sse_event(
             "tool-result",
             runId=tool_run_id,
             toolName=rag.tool_name,
@@ -177,7 +178,11 @@ class SimpleRAGService:
             ts=timer.elapsed_ms(),
         )
 
-        yield _sse("status", text=f"Found {len(results)} matching documents. {rag.generating_text}", ts=timer.elapsed_ms())
+        yield format_sse_event(
+            "status",
+            text=f"Found {len(results)} matching documents. {rag.generating_text}",
+            ts=timer.elapsed_ms(),
+        )
 
         context_chunks: list[str] = []
         for result in results:
@@ -202,10 +207,6 @@ class SimpleRAGService:
             async for chunk in stream:
                 delta = chunk.choices[0].delta.content or ""
                 if delta:
-                    yield _sse("text-delta", delta=delta)
+                    yield format_sse_event("text-delta", delta=delta)
         except Exception:
-            yield _sse("text-delta", delta="Sorry, I wasn't able to generate a response. Please try again.")
-
-
-def _sse(event_type: str, **fields: Any) -> str:
-    return f"data: {json.dumps({'type': event_type, **fields})}\n\n"
+            yield format_sse_event("text-delta", delta="Sorry, I wasn't able to generate a response. Please try again.")

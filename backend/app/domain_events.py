@@ -76,7 +76,10 @@ def _encode_domain_event(event: dict[str, Any]) -> dict[str, str]:
 
 def publish_domain_event(settings: Settings, domain: DomainPack, event: dict[str, Any]) -> str:
     client = create_redis_client(settings)
-    return str(client.xadd(domain_event_stream_key(domain), _encode_domain_event(event)))
+    try:
+        return str(client.xadd(domain_event_stream_key(domain), _encode_domain_event(event)))
+    finally:
+        client.close()
 
 
 def _decode_domain_event(event_id: str, raw_fields: dict[str, Any]) -> dict[str, Any]:

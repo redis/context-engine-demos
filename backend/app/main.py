@@ -18,6 +18,7 @@ from backend.app.contracts import ChatRequest
 from backend.app.internal_tools import InternalToolService, domain_runtime_config, internal_tool_names
 from backend.app.langgraph_agent import create_agent, create_checkpointer
 from backend.app.rag_service import SimpleRAGService
+from backend.app.sse import format_sse_event
 from backend.app.settings import get_settings
 
 settings = get_settings()
@@ -62,10 +63,6 @@ class Timer:
         delta = round((now - self._lap) * 1000)
         self._lap = now
         return max(delta, 1)
-
-
-def sse(event_type: str, **fields: Any) -> str:
-    return f"data: {json.dumps({'type': event_type, **fields})}\n\n"
 
 
 def _logo_src(path: Path) -> str:
@@ -166,7 +163,7 @@ async def domain_config() -> JSONResponse:
 
 async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
     timer = Timer()
-    yield sse("status", text="Initializing agent…", ts=timer.elapsed_ms())
+    yield format_sse_event("status", text="Initializing agent…", ts=timer.elapsed_ms())
 
     agent = await get_agent()
     defer_final_answer = runtime_config.get("enable_post_model_verifier", False)
@@ -198,11 +195,15 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
             thinking_step = _thinking_step_for_tool(name, tool_input)
             if thinking_step and thinking_step != last_thinking_step:
                 last_thinking_step = thinking_step
-                yield sse("thinking-step", step=thinking_step, ts=timer.elapsed_ms())
-            yield sse("tool-call", toolName=name, toolKind=_tool_kind(name),
-                       runId=event["run_id"],
-                       payload=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
-                       ts=timer.elapsed_ms())
+                yield format_sse_event("thinking-step", step=thinking_step, ts=timer.elapsed_ms())
+            yield format_sse_event(
+                "tool-call",
+                toolName=name,
+                toolKind=_tool_kind(name),
+                runId=event["run_id"],
+                payload=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
+                ts=timer.elapsed_ms(),
+            )
 
         elif kind == "on_tool_end":
             name = event.get("name", "")
@@ -213,9 +214,15 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                 output = {"result": str(raw_output)}
             start = tool_start_times.pop(event["run_id"], perf_counter())
             duration_ms = max(round((perf_counter() - start) * 1000), 1)
-            yield sse("tool-result", toolName=name, toolKind=_tool_kind(name),
-                       runId=event["run_id"],
-                       payload=output, durationMs=duration_ms, ts=timer.elapsed_ms())
+            yield format_sse_event(
+                "tool-result",
+                toolName=name,
+                toolKind=_tool_kind(name),
+                runId=event["run_id"],
+                payload=output,
+                durationMs=duration_ms,
+                ts=timer.elapsed_ms(),
+            )
 
         elif kind == "on_chat_model_start":
             if not settings.show_llm_trace_steps:
@@ -226,7 +233,13 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
             llm_step_ids[event["run_id"]] = step_id
             step = _llm_phase_label(llm_call_index=llm_call_counter, tool_calls_seen=tool_calls_seen)
             last_thinking_step = step
-            yield sse("thinking-step", step=step, stepId=step_id, stepKind="llm", ts=timer.elapsed_ms())
+            yield format_sse_event(
+                "thinking-step",
+                step=step,
+                stepId=step_id,
+                stepKind="llm",
+                ts=timer.elapsed_ms(),
+            )
 
         elif kind == "on_chat_model_end":
             if not settings.show_llm_trace_steps:
@@ -235,7 +248,7 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
             step_id = llm_step_ids.pop(event["run_id"], "")
             duration_ms = max(round((perf_counter() - start) * 1000), 1)
             if step_id:
-                yield sse(
+                yield format_sse_event(
                     "thinking-step-finish",
                     stepId=step_id,
                     durationMs=duration_ms,
@@ -243,7 +256,7 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                     ts=timer.elapsed_ms(),
                 )
             else:
-                yield sse(
+                yield format_sse_event(
                     "status",
                     text=f"LLM step completed in {_format_elapsed_ms(duration_ms)}",
                     ts=timer.elapsed_ms(),
@@ -257,11 +270,15 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
             chunk = event["data"].get("chunk")
             if chunk and hasattr(chunk, "content") and chunk.content:
                 if not (hasattr(chunk, "tool_calls") and chunk.tool_calls):
-                    yield sse("text-delta", delta=chunk.content)
+                    yield format_sse_event("text-delta", delta=chunk.content)
 
     if defer_final_answer and settings.show_final_verifier_trace_step:
-        yield sse("thinking-step", step="Validate the final answer against recent context and tool results.", ts=timer.elapsed_ms())
-        yield sse("status", text="Verifying final answer…", ts=timer.elapsed_ms())
+        yield format_sse_event(
+            "thinking-step",
+            step="Validate the final answer against recent context and tool results.",
+            ts=timer.elapsed_ms(),
+        )
+        yield format_sse_event("status", text="Verifying final answer…", ts=timer.elapsed_ms())
 
     if defer_final_answer:
         final_text = ""
@@ -273,15 +290,15 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                     final_text = msg.content if isinstance(msg.content, str) else str(msg.content)
                     break
         if final_text:
-            yield sse("text-delta", delta=final_text)
-    yield sse("done", totalElapsedMs=timer.elapsed_ms())
+            yield format_sse_event("text-delta", delta=final_text)
+    yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
 
 
 async def rag_event_stream(question: str) -> AsyncIterator[str]:
     timer = Timer()
     async for chunk in rag_service.stream_answer(question, timer):
         yield chunk
-    yield sse("done", totalElapsedMs=timer.elapsed_ms())
+    yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
 
 
 @app.post("/api/chat/stream")
