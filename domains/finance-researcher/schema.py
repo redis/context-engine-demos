@@ -47,10 +47,30 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("website_url", "str", "Investor relations or corporate website", index="text"),
         ),
         relationships=(
-            RelationshipSpec("documents", "Research documents for this company", "company_id"),
-            RelationshipSpec("metrics", "Financial metrics for this company", "company_id"),
-            RelationshipSpec("prices", "Price history for this company", "company_id"),
-            RelationshipSpec("events", "Coverage events for this company", "company_id"),
+            RelationshipSpec(
+                "documents",
+                "Research documents for this company",
+                "company_id",
+                "list[ResearchDocument]",
+            ),
+            RelationshipSpec(
+                "metrics",
+                "Financial metrics for this company",
+                "company_id",
+                "list[FinancialMetricPoint]",
+            ),
+            RelationshipSpec(
+                "prices",
+                "Price history for this company",
+                "company_id",
+                "list[PriceBar]",
+            ),
+            RelationshipSpec(
+                "events",
+                "Coverage events for this company",
+                "company_id",
+                "list[CoverageEvent]",
+            ),
         ),
     ),
     EntitySpec(
@@ -74,8 +94,13 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("sha256", "str", "SHA-256 digest of the downloaded artifact", index="tag", no_stem=True),
         ),
         relationships=(
-            RelationshipSpec("company", "Owning company", "company_id"),
-            RelationshipSpec("chunks", "Text chunks derived from this document", "document_id"),
+            RelationshipSpec("company", "Owning company", "company_id", "Company"),
+            RelationshipSpec(
+                "chunks",
+                "Text chunks derived from this document",
+                "document_id",
+                "list[ResearchChunk]",
+            ),
         ),
     ),
     EntitySpec(
@@ -97,12 +122,12 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
                 "Vector embedding of the chunk text",
                 index="vector",
                 vector_dim=1536,
-                distance_metric="COSINE",
+                distance_metric="cosine",
             ),
         ),
         relationships=(
-            RelationshipSpec("document", "Parent research document", "document_id"),
-            RelationshipSpec("company", "Owning company", "company_id"),
+            RelationshipSpec("document", "Parent research document", "document_id", "ResearchDocument"),
+            RelationshipSpec("company", "Owning company", "company_id", "Company"),
         ),
     ),
     EntitySpec(
@@ -124,7 +149,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("currency", "str | None", "Currency code such as USD", index="tag"),
         ),
         relationships=(
-            RelationshipSpec("company", "Owning company", "company_id"),
+            RelationshipSpec("company", "Owning company", "company_id", "Company"),
         ),
     ),
     EntitySpec(
@@ -145,7 +170,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("volume", "int", "Trading volume", index="numeric", sortable=True),
         ),
         relationships=(
-            RelationshipSpec("company", "Owning company", "company_id"),
+            RelationshipSpec("company", "Owning company", "company_id", "Company"),
         ),
     ),
     EntitySpec(
@@ -165,8 +190,13 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("importance_score", "float", "Relative importance score", index="numeric", sortable=True),
         ),
         relationships=(
-            RelationshipSpec("company", "Owning company", "company_id"),
-            RelationshipSpec("document", "Related research document", "document_id"),
+            RelationshipSpec("company", "Owning company", "company_id", "Company"),
+            RelationshipSpec(
+                "document",
+                "Related research document",
+                "document_id",
+                "ResearchDocument | None",
+            ),
         ),
     ),
 )

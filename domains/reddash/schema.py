@@ -37,7 +37,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("account_created_at", "str", "ISO timestamp of account creation"),
         ),
         relationships=(
-            RelationshipSpec("orders", "Orders placed by this customer", "customer_id"),
+            RelationshipSpec("orders", "Orders placed by this customer", "customer_id", "list[Order]"),
         ),
     ),
     # ── Restaurant ──────────────────────────────────────
@@ -57,7 +57,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("status", "str", "Operating status: open, closed, temporarily_closed", index="tag"),
         ),
         relationships=(
-            RelationshipSpec("orders", "Orders from this restaurant", "restaurant_id"),
+            RelationshipSpec("orders", "Orders from this restaurant", "restaurant_id", "list[Order]"),
         ),
     ),
     # ── Driver ──────────────────────────────────────────
@@ -104,9 +104,9 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("cancellation_reason", "str | None", "Reason for cancellation"),
         ),
         relationships=(
-            RelationshipSpec("customer", "Customer who placed the order", "customer_id"),
-            RelationshipSpec("restaurant", "Restaurant fulfilling the order", "restaurant_id"),
-            RelationshipSpec("driver", "Driver delivering the order", "driver_id"),
+            RelationshipSpec("customer", "Customer who placed the order", "customer_id", "Customer"),
+            RelationshipSpec("restaurant", "Restaurant fulfilling the order", "restaurant_id", "Restaurant"),
+            RelationshipSpec("driver", "Driver delivering the order", "driver_id", "Driver | None"),
         ),
     ),
     # ── OrderItem ───────────────────────────────────────
@@ -125,7 +125,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("special_instructions", "str | None", "Special delivery instructions"),
         ),
         relationships=(
-            RelationshipSpec("order", "Parent order", "order_id"),
+            RelationshipSpec("order", "Parent order", "order_id", "Order"),
         ),
     ),
     # ── DeliveryEvent ───────────────────────────────────
@@ -143,7 +143,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("actor", "str", "Who triggered it: customer, restaurant, driver, system", index="tag"),
         ),
         relationships=(
-            RelationshipSpec("order", "Associated order", "order_id"),
+            RelationshipSpec("order", "Associated order", "order_id", "Order"),
         ),
     ),
     # ── Payment ─────────────────────────────────────────
@@ -170,8 +170,8 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("refund_reason", "str | None", "Reason for refund"),
         ),
         relationships=(
-            RelationshipSpec("order", "Associated order", "order_id"),
-            RelationshipSpec("customer", "Customer who paid", "customer_id"),
+            RelationshipSpec("order", "Associated order", "order_id", "Order"),
+            RelationshipSpec("customer", "Customer who paid", "customer_id", "Customer"),
         ),
     ),
     # ── SupportTicket ───────────────────────────────────
@@ -192,8 +192,8 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("resolution", "str | None", "How it was resolved"),
         ),
         relationships=(
-            RelationshipSpec("customer", "Customer who filed the ticket", "customer_id"),
-            RelationshipSpec("order", "Related order", "order_id"),
+            RelationshipSpec("customer", "Customer who filed the ticket", "customer_id", "Customer"),
+            RelationshipSpec("order", "Related order", "order_id", "Order | None"),
         ),
     ),
     # ── Policy ──────────────────────────────────────────
@@ -209,7 +209,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("content", "str", "Full policy text", index="text"),
             FieldSpec(
                 "content_embedding", "list[float]", "Vector embedding of policy content",
-                index="vector", vector_dim=1536, distance_metric="COSINE",
+                index="vector", vector_dim=1536, distance_metric="cosine",
             ),
         ),
     ),

@@ -1,14 +1,12 @@
-"""Generated Context Surface models for the Finance Researcher domain."""
+"""Generated Context Surface models for the ShiftIQ domain."""
 
 from __future__ import annotations
-
-from typing import Any
 
 from context_surfaces.context_model import ContextField, ContextModel, ContextRelationship
 
 
 class AnalystProfile(ContextModel):
-    """AnalystProfile entity for the Finance Researcher domain."""
+    """AnalystProfile entity for the ShiftIQ domain."""
 
     __redis_key_template__ = "finance_researcher_analyst_profile:{analyst_id}"
 
@@ -61,7 +59,7 @@ class AnalystProfile(ContextModel):
 
 
 class Company(ContextModel):
-    """Company entity for the Finance Researcher domain."""
+    """Company entity for the ShiftIQ domain."""
 
     __redis_key_template__ = "finance_researcher_company:{company_id}"
 
@@ -129,29 +127,29 @@ class Company(ContextModel):
         index="text",
     )
 
-    documents: Any = ContextRelationship(
+    documents: list[ResearchDocument] = ContextRelationship(
         description="Research documents for this company",
         source_field="company_id",
     )
 
-    metrics: Any = ContextRelationship(
+    metrics: list[FinancialMetricPoint] = ContextRelationship(
         description="Financial metrics for this company",
         source_field="company_id",
     )
 
-    prices: Any = ContextRelationship(
+    prices: list[PriceBar] = ContextRelationship(
         description="Price history for this company",
         source_field="company_id",
     )
 
-    events: Any = ContextRelationship(
+    events: list[CoverageEvent] = ContextRelationship(
         description="Coverage events for this company",
         source_field="company_id",
     )
 
 
 class ResearchDocument(ContextModel):
-    """ResearchDocument entity for the Finance Researcher domain."""
+    """ResearchDocument entity for the ShiftIQ domain."""
 
     __redis_key_template__ = "finance_researcher_research_document:{document_id}"
 
@@ -223,19 +221,19 @@ class ResearchDocument(ContextModel):
         no_stem=True,
     )
 
-    company: Any = ContextRelationship(
+    company: Company = ContextRelationship(
         description="Owning company",
         source_field="company_id",
     )
 
-    chunks: Any = ContextRelationship(
+    chunks: list[ResearchChunk] = ContextRelationship(
         description="Text chunks derived from this document",
         source_field="document_id",
     )
 
 
 class ResearchChunk(ContextModel):
-    """ResearchChunk entity for the Finance Researcher domain."""
+    """ResearchChunk entity for the ShiftIQ domain."""
 
     __redis_key_template__ = "finance_researcher_research_chunk:{chunk_id}"
 
@@ -280,22 +278,22 @@ class ResearchChunk(ContextModel):
         description="Vector embedding of the chunk text",
         index="vector",
         vector_dim=1536,
-        distance_metric="COSINE",
+        distance_metric="cosine",
     )
 
-    document: Any = ContextRelationship(
+    document: ResearchDocument = ContextRelationship(
         description="Parent research document",
         source_field="document_id",
     )
 
-    company: Any = ContextRelationship(
+    company: Company = ContextRelationship(
         description="Owning company",
         source_field="company_id",
     )
 
 
 class FinancialMetricPoint(ContextModel):
-    """FinancialMetricPoint entity for the Finance Researcher domain."""
+    """FinancialMetricPoint entity for the ShiftIQ domain."""
 
     __redis_key_template__ = "finance_researcher_financial_metric_point:{point_id}"
 
@@ -356,14 +354,14 @@ class FinancialMetricPoint(ContextModel):
         index="tag",
     )
 
-    company: Any = ContextRelationship(
+    company: Company = ContextRelationship(
         description="Owning company",
         source_field="company_id",
     )
 
 
 class PriceBar(ContextModel):
-    """PriceBar entity for the Finance Researcher domain."""
+    """PriceBar entity for the ShiftIQ domain."""
 
     __redis_key_template__ = "finance_researcher_price_bar:{bar_id}"
 
@@ -424,14 +422,14 @@ class PriceBar(ContextModel):
         sortable=True,
     )
 
-    company: Any = ContextRelationship(
+    company: Company = ContextRelationship(
         description="Owning company",
         source_field="company_id",
     )
 
 
 class CoverageEvent(ContextModel):
-    """CoverageEvent entity for the Finance Researcher domain."""
+    """CoverageEvent entity for the ShiftIQ domain."""
 
     __redis_key_template__ = "finance_researcher_coverage_event:{event_id}"
 
@@ -482,12 +480,12 @@ class CoverageEvent(ContextModel):
         sortable=True,
     )
 
-    company: Any = ContextRelationship(
+    company: Company = ContextRelationship(
         description="Owning company",
         source_field="company_id",
     )
 
-    document: Any = ContextRelationship(
+    document: ResearchDocument | None = ContextRelationship(
         description="Related research document",
         source_field="document_id",
     )

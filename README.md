@@ -22,6 +22,7 @@ The repo currently includes built-in demo domains for:
 - `reddash` — food-delivery support
 - `electrohub` — electronics retail and order support
 - `finance-researcher` — ShiftIQ watchlist research across filings, metrics, prices, and live updates
+- `healthcare` — RedHealthConnect patient success portal (appointments, referrals, providers)
 
 **Two modes, same UI:**
 
@@ -127,6 +128,9 @@ Open http://localhost:3040 and try:
 - In `finance-researcher` / ShiftIQ:
   - *"Walk me through Oracle's latest quarter using both the filing and the structured metrics."*
   - *"What's new in my watchlist this week?"*
+- In `healthcare`:
+  - *"Do I have any upcoming appointments?"*
+  - *"Find me a cardiologist accepting new patients?"*
 
 ---
 
@@ -171,6 +175,19 @@ The `reddash` domain models a food-delivery platform with nine entity types:
 
 Reddash schema definitions live in [`domains/reddash/schema.py`](domains/reddash/schema.py). ElectroHub schema definitions live in [`domains/electrohub/schema.py`](domains/electrohub/schema.py). ShiftIQ schema definitions live in [`domains/finance-researcher/schema.py`](domains/finance-researcher/schema.py).
 
+The `healthcare` domain models a patient success portal with six entity types:
+
+| Entity | Key Pattern | Key Indexed Fields |
+|--------|-------------|-------------------|
+| **Location** | `healthcare_location:{id}` | name, city, type |
+| **Provider** | `healthcare_provider:{id}` | name, specialty, accepting_new_patients, languages |
+| **Patient** | `healthcare_patient:{id}` | name, email, insurance_status, preferred_language |
+| **Appointment** | `healthcare_appointment:{id}` | patient_id, provider_id, status, type, datetime |
+| **Referral** | `healthcare_referral:{id}` | patient_id, to_specialty, urgency, status |
+| **Waitlist** | `healthcare_waitlist:{id}` | patient_id, preferred_provider_id, appointment_type |
+
+Healthcare schema definitions live in [`domains/healthcare/schema.py`](domains/healthcare/schema.py).
+
 ---
 
 ## Demo Paths
@@ -180,6 +197,7 @@ See:
 - [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md)
 - [`domains/electrohub/docs/demo_paths.md`](domains/electrohub/docs/demo_paths.md)
 - [`domains/finance-researcher/docs/demo_paths.md`](domains/finance-researcher/docs/demo_paths.md)
+- [`domains/healthcare/docs/demo_paths.md`](domains/healthcare/docs/demo_paths.md)
 
 Reddash includes four scripted conversation flows:
 
@@ -247,7 +265,8 @@ context-engine-demos/
 ├── domains/
 │   ├── reddash/             # Delivery-support reference domain
 │   ├── electrohub/          # Electronics retail reference domain
-│   └── finance-researcher/  # ShiftIQ watchlist research domain
+│   ├── finance-researcher/  # ShiftIQ watchlist research domain
+│   └── healthcare/          # Patient success portal domain
 │       ├── domain.py        # DOMAIN export implementing the contract
 │       ├── schema.py        # Entity definitions
 │       ├── prompt.py        # Domain prompt/playbooks

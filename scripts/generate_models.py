@@ -46,8 +46,6 @@ def render(domain_id: str) -> str:
         "",
         "from __future__ import annotations",
         "",
-        "from typing import Any",
-        "",
         "from context_surfaces.context_model import ContextField, ContextModel, ContextRelationship",
         "",
         "",
@@ -65,7 +63,7 @@ def render(domain_id: str) -> str:
         for rel in entity.relationships:
             chunks.append(
                 "\n".join([
-                    f"    {rel.name}: Any = ContextRelationship(",
+                    f"    {rel.name}: {rel.target_type} = ContextRelationship(",
                     f'        description="{rel.description}",',
                     f'        source_field="{rel.source_field}",',
                     "    )",

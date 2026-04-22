@@ -25,8 +25,8 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("account_created_at", "str", "ISO timestamp for account creation"),
         ),
         relationships=(
-            RelationshipSpec("orders", "Orders placed by this customer", "customer_id"),
-            RelationshipSpec("support_cases", "Support cases opened by this customer", "customer_id"),
+            RelationshipSpec("orders", "Orders placed by this customer", "customer_id", "list[Order]"),
+            RelationshipSpec("support_cases", "Support cases opened by this customer", "customer_id", "list[SupportCase]"),
         ),
     ),
     EntitySpec(
@@ -90,8 +90,8 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("aisle_location", "str | None", "Approximate floor or aisle location"),
         ),
         relationships=(
-            RelationshipSpec("store", "Store carrying this item", "store_id"),
-            RelationshipSpec("product", "Product stocked at the store", "product_id"),
+            RelationshipSpec("store", "Store carrying this item", "store_id", "Store"),
+            RelationshipSpec("product", "Product stocked at the store", "product_id", "Product"),
         ),
     ),
     EntitySpec(
@@ -195,7 +195,7 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
                 "Vector embedding for the guide content",
                 index="vector",
                 vector_dim=1536,
-                distance_metric="COSINE",
+                distance_metric="cosine",
             ),
         ),
     ),
