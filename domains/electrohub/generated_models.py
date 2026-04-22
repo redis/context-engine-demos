@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from context_surfaces.context_model import ContextField, ContextModel, ContextRelationship
 
 
@@ -59,12 +57,12 @@ class Customer(ContextModel):
         description="ISO timestamp for account creation",
     )
 
-    orders: Any = ContextRelationship(
+    orders: list[Order] = ContextRelationship(
         description="Orders placed by this customer",
         source_field="customer_id",
     )
 
-    support_cases: Any = ContextRelationship(
+    support_cases: list[SupportCase] = ContextRelationship(
         description="Support cases opened by this customer",
         source_field="customer_id",
     )
@@ -272,12 +270,12 @@ class StoreInventory(ContextModel):
         description="Approximate floor or aisle location",
     )
 
-    store: Any = ContextRelationship(
+    store: Store = ContextRelationship(
         description="Store carrying this item",
         source_field="store_id",
     )
 
-    product: Any = ContextRelationship(
+    product: Product = ContextRelationship(
         description="Product stocked at the store",
         source_field="product_id",
     )
@@ -562,5 +560,5 @@ class Guide(ContextModel):
         description="Vector embedding for the guide content",
         index="vector",
         vector_dim=1536,
-        distance_metric="COSINE",
+        distance_metric="cosine",
     )
