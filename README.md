@@ -21,6 +21,7 @@ The repo currently includes built-in demo domains for:
 
 - `reddash` — food-delivery support
 - `electrohub` — electronics retail and order support
+- `finance-researcher` — ShiftIQ watchlist research across filings, metrics, prices, and live updates
 - `healthcare` — RedHealthConnect patient success portal (appointments, referrals, providers)
 
 **Two modes, same UI:**
@@ -124,9 +125,12 @@ Open http://localhost:3040 and try:
 - In `electrohub`:
   - *"Show me my recent ElectroHub orders."*
   - *"Can I pick that up at my local store?"*
+- In `finance-researcher` / ShiftIQ:
+  - *"Walk me through Oracle's latest quarter using both the filing and the structured metrics."*
+  - *"What's new in my watchlist this week?"*
 - In `healthcare`:
   - *"Do I have any upcoming appointments?"*
-  - *"Find me a cardiologist accepting new patients"*
+  - *"Find me a cardiologist accepting new patients?"*
 
 ---
 
@@ -169,7 +173,7 @@ The `reddash` domain models a food-delivery platform with nine entity types:
 | **SupportTicket** | `reddash_support_ticket:{id}` | customer_id, order_id, category, status |
 | **Policy** | `reddash_policy:{id}` | title, category, content, content_embedding (vector) |
 
-Reddash schema definitions live in [`domains/reddash/schema.py`](domains/reddash/schema.py). ElectroHub schema definitions live in [`domains/electrohub/schema.py`](domains/electrohub/schema.py).
+Reddash schema definitions live in [`domains/reddash/schema.py`](domains/reddash/schema.py). ElectroHub schema definitions live in [`domains/electrohub/schema.py`](domains/electrohub/schema.py). ShiftIQ schema definitions live in [`domains/finance-researcher/schema.py`](domains/finance-researcher/schema.py).
 
 The `healthcare` domain models a patient success portal with six entity types:
 
@@ -192,6 +196,7 @@ See:
 
 - [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md)
 - [`domains/electrohub/docs/demo_paths.md`](domains/electrohub/docs/demo_paths.md)
+- [`domains/finance-researcher/docs/demo_paths.md`](domains/finance-researcher/docs/demo_paths.md)
 - [`domains/healthcare/docs/demo_paths.md`](domains/healthcare/docs/demo_paths.md)
 
 Reddash includes four scripted conversation flows:
@@ -203,6 +208,13 @@ Reddash includes four scripted conversation flows:
 
 > **Tip:** After each path, toggle to Simple RAG mode and ask the same question to see the contrast.
 
+ShiftIQ includes flagship paths for:
+
+1. **Cross-company narrative comparison** — compare the latest filings and research chunks across peers
+2. **Metric-plus-document reasoning** — explain a quarter using both structured metrics and source documents
+3. **Peer trend analysis** — compare price and fundamentals trends, including RedisTimeSeries-backed queries
+4. **Live watchlist updates** — explain what changed this week using normalized coverage events and Redis Streams
+
 ## Presentations
 
 Keep domain-specific presentations with the domain itself:
@@ -213,6 +225,9 @@ Example:
 
 - [`domains/electrohub/presentations/director-demo/index.html`](domains/electrohub/presentations/director-demo/index.html)
 - [`domains/electrohub/presentations/director-demo/README.md`](domains/electrohub/presentations/director-demo/README.md)
+- [`domains/finance-researcher/presentations/engineering-brief/index.html`](domains/finance-researcher/presentations/engineering-brief/index.html)
+- [`domains/finance-researcher/presentations/engineering-brief/README.md`](domains/finance-researcher/presentations/engineering-brief/README.md)
+- [`domains/finance-researcher/presentations/model-browser/index.html`](domains/finance-researcher/presentations/model-browser/index.html)
 
 ---
 
@@ -250,6 +265,7 @@ context-engine-demos/
 ├── domains/
 │   ├── reddash/             # Delivery-support reference domain
 │   ├── electrohub/          # Electronics retail reference domain
+│   ├── finance-researcher/  # ShiftIQ watchlist research domain
 │   └── healthcare/          # Patient success portal domain
 │       ├── domain.py        # DOMAIN export implementing the contract
 │       ├── schema.py        # Entity definitions
@@ -257,7 +273,7 @@ context-engine-demos/
 │       ├── data_generator.py
 │       ├── generated_models.py
 │       ├── assets/logo.(svg|png|jpg|webp)
-│       └── docs/demo_paths.md
+│       ├── docs/demo_paths.md
 │       └── presentations/   # Domain-specific decks and assets
 ├── frontend/src/            # React + Vite chat UI
 │   ├── App.tsx              # Shared chat UI shell

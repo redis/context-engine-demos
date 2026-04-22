@@ -1,0 +1,105 @@
+{
+  "source": "Financial Modeling Prep",
+  "generated_at": "2026-04-15T01:48:34.828284+00:00",
+  "from": "2021-04-10",
+  "to": "2026-04-14",
+  "tickers": {
+    "AAPL": {
+      "status": "written",
+      "row_count": 1258,
+      "path": "data/prices/AAPL.csv",
+      "first_date": "2021-04-12",
+      "last_date": "2026-04-14",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "AMD": {
+      "status": "written",
+      "row_count": 1258,
+      "path": "data/prices/AMD.csv",
+      "first_date": "2021-04-12",
+      "last_date": "2026-04-14",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "AMZN": {
+      "status": "written",
+      "row_count": 1258,
+      "path": "data/prices/AMZN.csv",
+      "first_date": "2021-04-12",
+      "last_date": "2026-04-14",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "AVGO": {
+      "status": "error",
+      "error": "Client error '402 Payment Required' for url 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=AVGO&from=2021-04-10&to=2026-04-14&apikey=X06CCkwfSLpNasiKPtSyvlgQ9ySYtAKL'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "GOOGL": {
+      "status": "written",
+      "row_count": 1258,
+      "path": "data/prices/GOOGL.csv",
+      "first_date": "2021-04-12",
+      "last_date": "2026-04-14",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "INTC": {
+      "status": "written",
+      "row_count": 1258,
+      "path": "data/prices/INTC.csv",
+      "first_date": "2021-04-12",
+      "last_date": "2026-04-14",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "MDB": {
+      "status": "error",
+      "error": "Client error '402 Payment Required' for url 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=MDB&from=2021-04-10&to=2026-04-14&apikey=X06CCkwfSLpNasiKPtSyvlgQ9ySYtAKL'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "META": {
+      "status": "written",
+      "row_count": 1258,
+      "path": "data/prices/META.csv",
+      "first_date": "2021-04-12",
+      "last_date": "2026-04-14",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "MSFT": {
+      "status": "written",
+      "row_count": 1258,
+      "path": "data/prices/MSFT.csv",
+      "first_date": "2021-04-12",
+      "last_date": "2026-04-14",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "MU": {
+      "status": "error",
+      "error": "Client error '402 Payment Required' for url 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=MU&from=2021-04-10&to=2026-04-14&apikey=X06CCkwfSLpNasiKPtSyvlgQ9ySYtAKL'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "NVDA": {
+      "status": "written",
+      "row_count": 1258,
+      "path": "data/prices/NVDA.csv",
+      "first_date": "2021-04-12",
+      "last_date": "2026-04-14",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "ORCL": {
+      "status": "error",
+      "error": "Client error '402 Payment Required' for url 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=ORCL&from=2021-04-10&to=2026-04-14&apikey=X06CCkwfSLpNasiKPtSyvlgQ9ySYtAKL'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "QCOM": {
+      "status": "error",
+      "error": "Client error '402 Payment Required' for url 'https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=QCOM&from=2021-04-10&to=2026-04-14&apikey=X06CCkwfSLpNasiKPtSyvlgQ9ySYtAKL'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    },
+    "TSLA": {
+      "status": "written",
+      "row_count": 1258,
+      "path": "data/prices/TSLA.csv",
+      "first_date": "2021-04-12",
+      "last_date": "2026-04-14",
+      "endpoint": "https://financialmodelingprep.com/stable/historical-price-eod/full"
+    }
+  }
+}

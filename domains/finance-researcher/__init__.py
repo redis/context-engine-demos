@@ -1,0 +1,1 @@
+"""Finance Researcher domain."""

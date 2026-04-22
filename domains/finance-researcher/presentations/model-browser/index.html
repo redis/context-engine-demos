@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ShiftIQ Context Surfaces Model Browser</title>
+<link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/atom-one-dark.min.css" />
+<style>
+:root { --bg:#081018; --panel:#101a26; --line:rgba(111,211,255,.18); --text:#eef4fb; --muted:#9fb0c2; --accent:#6fd3ff; }
+body { margin:0; font-family: Manrope, system-ui, sans-serif; background:linear-gradient(180deg,#081018,#0d1826); color:var(--text); }
+main { max-width: 1180px; margin: 0 auto; padding: 32px 24px 72px; }
+h1 { margin: 0 0 10px; font-size: 42px; letter-spacing:-.03em; }
+p { color: var(--muted); font-size: 18px; line-height:1.5; }
+nav { display:flex; flex-wrap:wrap; gap:10px; margin: 24px 0 28px; }
+nav a { color:var(--text); text-decoration:none; border:1px solid var(--line); background:rgba(255,255,255,.03); padding:10px 14px; border-radius:999px; font-size:14px; }
+section { margin: 0 0 24px; border:1px solid var(--line); background: rgba(16,26,38,.9); border-radius: 22px; overflow:hidden; box-shadow: 0 18px 50px rgba(0,0,0,.25); }
+.section-head { display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--line); }
+.section-head h2 { margin:0; font-size:26px; letter-spacing:-.03em; }
+.section-head a { color: var(--accent); text-decoration:none; font-size:14px; }
+pre { margin:0; padding:0; overflow:auto; background:#0a111a; }
+code { font-family: 'IBM Plex Mono', monospace; font-size:14px; line-height:1.55; color:#d7e9ff; }
+pre code.hljs { padding:22px; background:#0a111a; }
+.callout { margin: 18px 0 0; border:1px solid var(--line); background:rgba(255,255,255,.03); border-radius:18px; padding:16px 18px; }
+.callout strong { display:block; margin-bottom:8px; }
+</style>
+</head>
+<body>
+<main id="top">
+<h1>ShiftIQ Context Surfaces Model Browser</h1>
+<p>Browser-friendly view of the annotated Context Surfaces data model classes used by the ShiftIQ finance demo. These are the generated models that drive the MCP tool surface.</p>
+<div class="callout"><strong>Best demo file</strong><span><code>domains/finance-researcher/generated_models.py</code> shows the exact <code>ContextField</code> and <code>ContextRelationship</code> annotations the surface registers, plus the import statements that make the model definition readable to engineers.</span></div>
+<nav><a href="#Imports">Imports</a><a href="#SurfaceSetup">Surface Setup</a><a href="#AnalystProfile">AnalystProfile</a><a href="#Company">Company</a><a href="#ResearchDocument">ResearchDocument</a><a href="#ResearchChunk">ResearchChunk</a><a href="#FinancialMetricPoint">FinancialMetricPoint</a><a href="#PriceBar">PriceBar</a><a href="#CoverageEvent">CoverageEvent</a></nav>
+<section id="Imports"><div class="section-head"><h2>Imports</h2><a href="#top">Back to top</a></div><pre><code>from __future__ import annotations
+
+from typing import Any
+
+from context_surfaces.context_model import ContextField, ContextModel, ContextRelationship</code></pre></section>
+<section id="SurfaceSetup"><div class="section-head"><h2>Surface Setup</h2><a href="#top">Back to top</a></div><pre><code>ctxctl profile use default</code></pre><pre><code>ctxctl context-surface create \
+  --name "ShiftIQ Research Surface" \
+  --data-model domains/finance-researcher/generated_models.py</code></pre><pre><code>ctxctl context-surface load \
+  --surface "ShiftIQ Research Surface" \
+  --entities output/finance-researcher/*.jsonl</code></pre></section>
+<section id="AnalystProfile"><div class="section-head"><h2>AnalystProfile</h2><a href="#top">Back to top</a></div><pre><code>class AnalystProfile(ContextModel):
+    &quot;&quot;&quot;AnalystProfile entity for the Finance Researcher domain.&quot;&quot;&quot;
+
+    __redis_key_template__ = &quot;finance_researcher_analyst_profile:{analyst_id}&quot;
+
+    analyst_id: str = ContextField(
+        description=&quot;Unique analyst identifier&quot;,
+        is_key_component=True,
+    )
+
+    name: str = ContextField(
+        description=&quot;Analyst full name&quot;,
+        index=&quot;text&quot;,
+        weight=2.0,
+    )
+
+    email: str = ContextField(
+        description=&quot;Analyst email&quot;,
+        index=&quot;text&quot;,
+        no_stem=True,
+    )
+
+    firm_name: str = ContextField(
+        description=&quot;Research firm or desk&quot;,
+        index=&quot;text&quot;,
+    )
+
+    role: str = ContextField(
+        description=&quot;Analyst role or title&quot;,
+        index=&quot;text&quot;,
+    )
+
+    watchlist_name: str = ContextField(
+        description=&quot;Named watchlist used for the demo&quot;,
+        index=&quot;text&quot;,
+    )
+
+    watchlist_theme: str = ContextField(
+        description=&quot;Primary coverage theme&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    active_watchlist_count: int = ContextField(
+        description=&quot;Number of companies in the active watchlist&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    as_of_date: str = ContextField(
+        description=&quot;ISO date for the analyst context snapshot&quot;,
+    )</code></pre></section><section id="Company"><div class="section-head"><h2>Company</h2><a href="#top">Back to top</a></div><pre><code>class Company(ContextModel):
+    &quot;&quot;&quot;Company entity for the Finance Researcher domain.&quot;&quot;&quot;
+
+    __redis_key_template__ = &quot;finance_researcher_company:{company_id}&quot;
+
+    company_id: str = ContextField(
+        description=&quot;Unique company identifier&quot;,
+        is_key_component=True,
+    )
+
+    ticker: str = ContextField(
+        description=&quot;Public ticker symbol&quot;,
+        index=&quot;tag&quot;,
+        no_stem=True,
+    )
+
+    company_name: str = ContextField(
+        description=&quot;Company legal or common name&quot;,
+        index=&quot;text&quot;,
+        weight=2.0,
+    )
+
+    cik: str = ContextField(
+        description=&quot;SEC CIK identifier&quot;,
+        index=&quot;tag&quot;,
+        no_stem=True,
+    )
+
+    sector: str = ContextField(
+        description=&quot;GICS sector&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    subsector: str = ContextField(
+        description=&quot;GICS subsector or business line&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    benchmark_group: str = ContextField(
+        description=&quot;Peer benchmark group&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    exchange: str = ContextField(
+        description=&quot;Primary listing exchange&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    headquarters_city: str = ContextField(
+        description=&quot;Company headquarters city&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    headquarters_state: str = ContextField(
+        description=&quot;Company headquarters state&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    watchlist_rank: int = ContextField(
+        description=&quot;Priority rank in the analyst watchlist&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    website_url: str = ContextField(
+        description=&quot;Investor relations or corporate website&quot;,
+        index=&quot;text&quot;,
+    )
+
+    documents: Any = ContextRelationship(
+        description=&quot;Research documents for this company&quot;,
+        source_field=&quot;company_id&quot;,
+    )
+
+    metrics: Any = ContextRelationship(
+        description=&quot;Financial metrics for this company&quot;,
+        source_field=&quot;company_id&quot;,
+    )
+
+    prices: Any = ContextRelationship(
+        description=&quot;Price history for this company&quot;,
+        source_field=&quot;company_id&quot;,
+    )
+
+    events: Any = ContextRelationship(
+        description=&quot;Coverage events for this company&quot;,
+        source_field=&quot;company_id&quot;,
+    )</code></pre></section><section id="ResearchDocument"><div class="section-head"><h2>ResearchDocument</h2><a href="#top">Back to top</a></div><pre><code>class ResearchDocument(ContextModel):
+    &quot;&quot;&quot;ResearchDocument entity for the Finance Researcher domain.&quot;&quot;&quot;
+
+    __redis_key_template__ = &quot;finance_researcher_research_document:{document_id}&quot;
+
+    document_id: str = ContextField(
+        description=&quot;Unique document identifier&quot;,
+        is_key_component=True,
+    )
+
+    company_id: str = ContextField(
+        description=&quot;Parent company identifier&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    ticker: str = ContextField(
+        description=&quot;Company ticker symbol&quot;,
+        index=&quot;tag&quot;,
+        no_stem=True,
+    )
+
+    title: str = ContextField(
+        description=&quot;Document title&quot;,
+        index=&quot;text&quot;,
+        weight=2.0,
+    )
+
+    source_type: str = ContextField(
+        description=&quot;Source type such as sec_filing, earnings_release, presentation, or remarks&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    document_family: str = ContextField(
+        description=&quot;Normalized family label for the source document&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    published_at: str = ContextField(
+        description=&quot;ISO timestamp when the source was published&quot;,
+    )
+
+    fiscal_period: str | None = ContextField(
+        description=&quot;Fiscal period such as Q1, Q2, Q3, or FY&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    fiscal_year: int | None = ContextField(
+        description=&quot;Fiscal year&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    source_url: str = ContextField(
+        description=&quot;Canonical source URL&quot;,
+        index=&quot;text&quot;,
+    )
+
+    local_path: str = ContextField(
+        description=&quot;Relative path to the downloaded artifact&quot;,
+        index=&quot;text&quot;,
+    )
+
+    mime_type: str = ContextField(
+        description=&quot;Artifact mime type&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    sha256: str = ContextField(
+        description=&quot;SHA-256 digest of the downloaded artifact&quot;,
+        index=&quot;tag&quot;,
+        no_stem=True,
+    )
+
+    company: Any = ContextRelationship(
+        description=&quot;Owning company&quot;,
+        source_field=&quot;company_id&quot;,
+    )
+
+    chunks: Any = ContextRelationship(
+        description=&quot;Text chunks derived from this document&quot;,
+        source_field=&quot;document_id&quot;,
+    )</code></pre></section><section id="ResearchChunk"><div class="section-head"><h2>ResearchChunk</h2><a href="#top">Back to top</a></div><pre><code>class ResearchChunk(ContextModel):
+    &quot;&quot;&quot;ResearchChunk entity for the Finance Researcher domain.&quot;&quot;&quot;
+
+    __redis_key_template__ = &quot;finance_researcher_research_chunk:{chunk_id}&quot;
+
+    chunk_id: str = ContextField(
+        description=&quot;Unique chunk identifier&quot;,
+        is_key_component=True,
+    )
+
+    document_id: str = ContextField(
+        description=&quot;Parent research document&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    company_id: str = ContextField(
+        description=&quot;Parent company identifier&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    ticker: str = ContextField(
+        description=&quot;Company ticker symbol&quot;,
+        index=&quot;tag&quot;,
+        no_stem=True,
+    )
+
+    section_heading: str | None = ContextField(
+        description=&quot;Section heading or subsection title&quot;,
+        index=&quot;text&quot;,
+    )
+
+    page_label: str | None = ContextField(
+        description=&quot;Page label, page number, or extracted section marker&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    chunk_text: str = ContextField(
+        description=&quot;Normalized chunk text&quot;,
+        index=&quot;text&quot;,
+        weight=2.0,
+    )
+
+    content_embedding: list[float] = ContextField(
+        description=&quot;Vector embedding of the chunk text&quot;,
+        index=&quot;vector&quot;,
+        vector_dim=1536,
+        distance_metric=&quot;COSINE&quot;,
+    )
+
+    document: Any = ContextRelationship(
+        description=&quot;Parent research document&quot;,
+        source_field=&quot;document_id&quot;,
+    )
+
+    company: Any = ContextRelationship(
+        description=&quot;Owning company&quot;,
+        source_field=&quot;company_id&quot;,
+    )</code></pre></section><section id="FinancialMetricPoint"><div class="section-head"><h2>FinancialMetricPoint</h2><a href="#top">Back to top</a></div><pre><code>class FinancialMetricPoint(ContextModel):
+    &quot;&quot;&quot;FinancialMetricPoint entity for the Finance Researcher domain.&quot;&quot;&quot;
+
+    __redis_key_template__ = &quot;finance_researcher_financial_metric_point:{point_id}&quot;
+
+    point_id: str = ContextField(
+        description=&quot;Unique metric point identifier&quot;,
+        is_key_component=True,
+    )
+
+    company_id: str = ContextField(
+        description=&quot;Parent company identifier&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    ticker: str = ContextField(
+        description=&quot;Company ticker symbol&quot;,
+        index=&quot;tag&quot;,
+        no_stem=True,
+    )
+
+    metric_name: str = ContextField(
+        description=&quot;Metric name such as revenue or net_income&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    period_type: str = ContextField(
+        description=&quot;Annual or quarterly period type&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    fiscal_year: int = ContextField(
+        description=&quot;Fiscal year&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    fiscal_period: str | None = ContextField(
+        description=&quot;Fiscal period label such as Q1, Q2, Q3, Q4, or FY&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    period_end: str = ContextField(
+        description=&quot;ISO period end date&quot;,
+    )
+
+    value: float = ContextField(
+        description=&quot;Metric value&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    unit: str = ContextField(
+        description=&quot;Unit of measure&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    currency: str | None = ContextField(
+        description=&quot;Currency code such as USD&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    company: Any = ContextRelationship(
+        description=&quot;Owning company&quot;,
+        source_field=&quot;company_id&quot;,
+    )</code></pre></section><section id="PriceBar"><div class="section-head"><h2>PriceBar</h2><a href="#top">Back to top</a></div><pre><code>class PriceBar(ContextModel):
+    &quot;&quot;&quot;PriceBar entity for the Finance Researcher domain.&quot;&quot;&quot;
+
+    __redis_key_template__ = &quot;finance_researcher_price_bar:{bar_id}&quot;
+
+    bar_id: str = ContextField(
+        description=&quot;Unique price bar identifier&quot;,
+        is_key_component=True,
+    )
+
+    company_id: str = ContextField(
+        description=&quot;Parent company identifier&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    ticker: str = ContextField(
+        description=&quot;Company ticker symbol&quot;,
+        index=&quot;tag&quot;,
+        no_stem=True,
+    )
+
+    trade_date: str = ContextField(
+        description=&quot;Trading date&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    open: float = ContextField(
+        description=&quot;Opening price&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    high: float = ContextField(
+        description=&quot;High price&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    low: float = ContextField(
+        description=&quot;Low price&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    close: float = ContextField(
+        description=&quot;Close price&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    adj_close: float = ContextField(
+        description=&quot;Adjusted close price&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    volume: int = ContextField(
+        description=&quot;Trading volume&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    company: Any = ContextRelationship(
+        description=&quot;Owning company&quot;,
+        source_field=&quot;company_id&quot;,
+    )</code></pre></section><section id="CoverageEvent"><div class="section-head"><h2>CoverageEvent</h2><a href="#top">Back to top</a></div><pre><code>class CoverageEvent(ContextModel):
+    &quot;&quot;&quot;CoverageEvent entity for the Finance Researcher domain.&quot;&quot;&quot;
+
+    __redis_key_template__ = &quot;finance_researcher_coverage_event:{event_id}&quot;
+
+    event_id: str = ContextField(
+        description=&quot;Unique event identifier&quot;,
+        is_key_component=True,
+    )
+
+    company_id: str = ContextField(
+        description=&quot;Parent company identifier&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    ticker: str = ContextField(
+        description=&quot;Company ticker symbol&quot;,
+        index=&quot;tag&quot;,
+        no_stem=True,
+    )
+
+    event_family: str = ContextField(
+        description=&quot;Normalized family such as filing, earnings, presentation, or price&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    event_type: str = ContextField(
+        description=&quot;Event type such as new_filing, new_release, new_presentation, or price_move&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    published_at: str = ContextField(
+        description=&quot;ISO timestamp of the event&quot;,
+    )
+
+    document_id: str | None = ContextField(
+        description=&quot;Related research document&quot;,
+        index=&quot;tag&quot;,
+    )
+
+    headline: str = ContextField(
+        description=&quot;Short human-readable event headline&quot;,
+        index=&quot;text&quot;,
+        weight=2.0,
+    )
+
+    importance_score: float = ContextField(
+        description=&quot;Relative importance score&quot;,
+        index=&quot;numeric&quot;,
+        sortable=True,
+    )
+
+    company: Any = ContextRelationship(
+        description=&quot;Owning company&quot;,
+        source_field=&quot;company_id&quot;,
+    )
+
+    document: Any = ContextRelationship(
+        description=&quot;Related research document&quot;,
+        source_field=&quot;document_id&quot;,
+    )</code></pre></section>
+</main>
+<script src="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
+<script>
+  document.querySelectorAll("pre code").forEach((block) => {
+    block.classList.add("language-python");
+    hljs.highlightElement(block);
+  });
+</script>
+</body>
+</html>

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from context_surfaces.context_model import ContextField, ContextModel, ContextRelationship
 
 
@@ -90,7 +88,7 @@ class Provider(ContextModel):
         index="text",
     )
 
-    location: Any = ContextRelationship(
+    location: Location = ContextRelationship(
         description="Primary location",
         source_field="location_id",
     )
@@ -143,7 +141,7 @@ class Patient(ContextModel):
         index="tag",
     )
 
-    primary_provider: Any = ContextRelationship(
+    primary_provider: Provider = ContextRelationship(
         description="Primary care provider",
         source_field="primary_provider_id",
     )
@@ -194,17 +192,17 @@ class Appointment(ContextModel):
         index="text",
     )
 
-    patient: Any = ContextRelationship(
+    patient: Patient = ContextRelationship(
         description="Patient",
         source_field="patient_id",
     )
 
-    provider: Any = ContextRelationship(
+    provider: Provider = ContextRelationship(
         description="Provider",
         source_field="provider_id",
     )
 
-    location: Any = ContextRelationship(
+    location: Location = ContextRelationship(
         description="Location",
         source_field="location_id",
     )
@@ -260,12 +258,12 @@ class Referral(ContextModel):
         index="tag",
     )
 
-    patient: Any = ContextRelationship(
+    patient: Patient = ContextRelationship(
         description="Patient",
         source_field="patient_id",
     )
 
-    referring_provider: Any = ContextRelationship(
+    referring_provider: Provider = ContextRelationship(
         description="Referring provider",
         source_field="referring_provider_id",
     )
@@ -316,12 +314,12 @@ class Waitlist(ContextModel):
         index="text",
     )
 
-    patient: Any = ContextRelationship(
+    patient: Patient = ContextRelationship(
         description="Patient",
         source_field="patient_id",
     )
 
-    preferred_provider: Any = ContextRelationship(
+    preferred_provider: Provider = ContextRelationship(
         description="Preferred provider",
         source_field="preferred_provider_id",
     )

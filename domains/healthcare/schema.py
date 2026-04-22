@@ -52,7 +52,9 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("languages", "str", "Languages spoken", index="text"),
             FieldSpec("email", "str", "Email", index="text"),
         ),
-        relationships=(RelationshipSpec("location", "Primary location", "location_id"),),
+        relationships=(
+            RelationshipSpec("location", "Primary location", "location_id", "Location"),
+        ),
     ),
     # ── Patient ─────────────────────────────────────────
     EntitySpec(
@@ -73,7 +75,12 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("primary_provider_id", "str", "Primary provider", index="tag"),
         ),
         relationships=(
-            RelationshipSpec("primary_provider", "Primary care provider", "primary_provider_id"),
+            RelationshipSpec(
+                "primary_provider",
+                "Primary care provider",
+                "primary_provider_id",
+                "Provider",
+            ),
         ),
     ),
     # ── Appointment ─────────────────────────────────────
@@ -97,9 +104,9 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("notes", "str", "Appointment notes", index="text"),
         ),
         relationships=(
-            RelationshipSpec("patient", "Patient", "patient_id"),
-            RelationshipSpec("provider", "Provider", "provider_id"),
-            RelationshipSpec("location", "Location", "location_id"),
+            RelationshipSpec("patient", "Patient", "patient_id", "Patient"),
+            RelationshipSpec("provider", "Provider", "provider_id", "Provider"),
+            RelationshipSpec("location", "Location", "location_id", "Location"),
         ),
     ),
     # ── Referral ────────────────────────────────────────
@@ -120,8 +127,13 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("received_date", "str", "Date received", index="tag"),
         ),
         relationships=(
-            RelationshipSpec("patient", "Patient", "patient_id"),
-            RelationshipSpec("referring_provider", "Referring provider", "referring_provider_id"),
+            RelationshipSpec("patient", "Patient", "patient_id", "Patient"),
+            RelationshipSpec(
+                "referring_provider",
+                "Referring provider",
+                "referring_provider_id",
+                "Provider",
+            ),
         ),
     ),
     # ── Waitlist ────────────────────────────────────────
@@ -146,8 +158,13 @@ ENTITY_SPECS: tuple[EntitySpec, ...] = (
             FieldSpec("notes", "str", "Additional notes", index="text"),
         ),
         relationships=(
-            RelationshipSpec("patient", "Patient", "patient_id"),
-            RelationshipSpec("preferred_provider", "Preferred provider", "preferred_provider_id"),
+            RelationshipSpec("patient", "Patient", "patient_id", "Patient"),
+            RelationshipSpec(
+                "preferred_provider",
+                "Preferred provider",
+                "preferred_provider_id",
+                "Provider",
+            ),
         ),
     ),
 )
