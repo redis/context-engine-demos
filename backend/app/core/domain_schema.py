@@ -24,6 +24,7 @@ class RelationshipSpec:
     name: str
     description: str
     source_field: str
+    target_type: str
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,8 @@ def entity_by_class(entity_specs: tuple[EntitySpec, ...]) -> dict[str, EntitySpe
 
 def _base_type_name(type_hint: str) -> str:
     cleaned = type_hint.strip()
+    if cleaned.startswith("list[") and cleaned.endswith("]"):
+        cleaned = cleaned[5:-1].strip()
     if "|" in cleaned:
         cleaned = cleaned.split("|", 1)[0].strip()
     return cleaned.removeprefix("Optional[").removesuffix("]")
@@ -59,6 +62,7 @@ def validate_entity_specs(entity_specs: tuple[EntitySpec, ...]) -> list[str]:
     errors: list[str] = []
     seen_classes: set[str] = set()
     seen_files: set[str] = set()
+    valid_distance_metrics = {"cosine", "euclidean", "dot_product"}
 
     for spec in entity_specs:
         if spec.class_name in seen_classes:
@@ -75,6 +79,31 @@ def validate_entity_specs(entity_specs: tuple[EntitySpec, ...]) -> list[str]:
                     f"{spec.class_name}.{field_spec.name} uses type '{field_spec.type_hint}' "
                     "with index='tag'. Numeric JSON values are not indexed by TAG fields; "
                     "use type 'str' for identifiers or index='numeric'."
+                )
+            if field_spec.distance_metric and field_spec.distance_metric not in valid_distance_metrics:
+                errors.append(
+                    "Invalid vector distance metric: "
+                    f"{spec.class_name}.{field_spec.name} uses "
+                    f"'{field_spec.distance_metric}', but supported values are "
+                    "cosine, euclidean, or dot_product."
+                )
+
+    entity_names = {spec.class_name for spec in entity_specs}
+    for spec in entity_specs:
+        field_names = {field.name for field in spec.fields}
+        for relationship in spec.relationships:
+            if relationship.source_field not in field_names:
+                errors.append(
+                    "Invalid relationship source field: "
+                    f"{spec.class_name}.{relationship.name} references "
+                    f"'{relationship.source_field}', which is not defined on the entity."
+                )
+            base_target = _base_type_name(relationship.target_type)
+            if base_target not in entity_names:
+                errors.append(
+                    "Invalid relationship target: "
+                    f"{spec.class_name}.{relationship.name} targets "
+                    f"'{relationship.target_type}', which does not match any entity class."
                 )
 
     return errors
