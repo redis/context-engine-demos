@@ -130,7 +130,7 @@ class DomainPack(Protocol):
         *,
         output_dir: Path,
         seed: int | None = None,
-        update_env_file: bool = True,
+        update_env_file: bool = False,
     ) -> GeneratedDataset:
         ...
 
