@@ -39,14 +39,58 @@ def render_field(field: FieldSpec) -> str:
     return "\n".join(lines)
 
 
+def _build_target_resolver(domain: object) -> dict[str, str]:
+    """Build a mapping from lowercase name -> class_name for relationship target resolution.
+
+    Maps both singular and plural forms of entity class names so that
+    relationship names like "orders", "customer", "primary_provider",
+    or "referring_provider" can be resolved to entity class names.
+    """
+    mapping: dict[str, str] = {}
+    for entity in domain.get_entity_specs():
+        lower = entity.class_name.lower()
+        mapping[lower] = entity.class_name
+        # Simple plural: "order" -> "orders"
+        mapping[lower + "s"] = entity.class_name
+        mapping[lower + "es"] = entity.class_name
+        # Handle "ies" plural (e.g. "inventory" -> "inventories")
+        if lower.endswith("y"):
+            mapping[lower[:-1] + "ies"] = entity.class_name
+    return mapping
+
+
+def _resolve_target(rel_name: str, resolver: dict[str, str], fallback: str) -> str:
+    """Resolve a relationship name to a target entity class name.
+
+    Tries the full name first (with and without underscores), then
+    progressively strips leading underscore-delimited prefixes
+    (e.g. "referring_provider" -> "provider").
+    """
+    lower = rel_name.lower()
+    # Try with underscores removed (e.g. "support_cases" -> "supportcases")
+    collapsed = lower.replace("_", "")
+    for candidate in (lower, collapsed):
+        if candidate in resolver:
+            return resolver[candidate]
+    # Strip leading prefixes
+    parts = lower.split("_")
+    for i in range(1, len(parts)):
+        candidate = "_".join(parts[i:])
+        collapsed = candidate.replace("_", "")
+        for c in (candidate, collapsed):
+            if c in resolver:
+                return resolver[c]
+    return fallback
+
+
 def render(domain_id: str) -> str:
     domain = load_domain(domain_id)
+    resolver = _build_target_resolver(domain)
+
     chunks = [
         f'"""Generated Context Surface models for the {domain.manifest.branding.app_name} domain."""',
         "",
         "from __future__ import annotations",
-        "",
-        "from typing import Any",
         "",
         "from context_surfaces.context_model import ContextField, ContextModel, ContextRelationship",
         "",
@@ -63,9 +107,10 @@ def render(domain_id: str) -> str:
             chunks.append(render_field(field))
             chunks.append("")
         for rel in entity.relationships:
+            target_class = _resolve_target(rel.name, resolver, entity.class_name)
             chunks.append(
                 "\n".join([
-                    f"    {rel.name}: Any = ContextRelationship(",
+                    f"    {rel.name}: {target_class} = ContextRelationship(",
                     f'        description="{rel.description}",',
                     f'        source_field="{rel.source_field}",',
                     "    )",
