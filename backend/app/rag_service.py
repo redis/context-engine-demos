@@ -55,7 +55,10 @@ class SimpleRAGService:
         self.settings = settings
         self.cs_service = cs_service
         self.domain = get_active_domain(settings)
-        self.openai = AsyncOpenAI(api_key=settings.openai_api_key)
+        client_kw: dict[str, Any] = {"api_key": settings.openai_api_key}
+        if settings.openai_base_url:
+            client_kw["base_url"] = settings.openai_base_url
+        self.openai = AsyncOpenAI(**client_kw)
         self._vector_tool_name: str | None = None
         self._text_tool_name: str | None = None
 

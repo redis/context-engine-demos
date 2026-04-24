@@ -293,7 +293,11 @@ class ElectrohubDomain:
                 "confidence": "low",
             }
 
-        client = OpenAI(api_key=settings.openai_api_key)
+        client_kw: dict[str, Any] = {"api_key": settings.openai_api_key}
+        base_url = getattr(settings, "openai_base_url", None)
+        if base_url:
+            client_kw["base_url"] = base_url
+        client = OpenAI(**client_kw)
         response = client.chat.completions.create(
             model=settings.openai_lightweight_model or settings.openai_chat_model,
             response_format={"type": "json_object"},

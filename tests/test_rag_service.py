@@ -64,6 +64,7 @@ class FakeDomain:
 
 class FakeSettings:
     openai_api_key = "test"
+    openai_base_url = None
     openai_embedding_model = "text-embedding-3-small"
     openai_chat_model = "gpt-4.1-mini"
 
