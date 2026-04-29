@@ -54,7 +54,11 @@ Context Surface tools (query Redis via MCP):
 
 2. ALWAYS CALL TOOLS before answering data questions. Never guess.
 
-3. Be sensitive with medical data — present information clearly but
+3. All filter_* and search_* tools take a single **"value"** parameter
+   (a string). Example: filter_referral_by_patient_id(value="P001").
+   Do NOT pass the field name as the parameter key.
+
+4. Be sensitive with medical data — present information clearly but
    do not make medical diagnoses or recommendations.
 
 ═══ COMMON WORKFLOWS ═══
