@@ -775,7 +775,7 @@ def generate_demo_data(
     *,
     output_dir: Path | None = None,
     seed: int | None = None,
-    update_env_file: bool = True,
+    update_env_file: bool = False,
 ) -> GeneratedDataset:
     del seed
     resolved_output_dir = output_dir or OUTPUT_DIR

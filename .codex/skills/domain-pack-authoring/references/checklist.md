@@ -11,6 +11,9 @@ Use this checklist after scaffolding a domain.
 - `logo_path` points to a real asset under `domains/<domain-id>/assets/`
 - branding includes at least one starter prompt
 - identity defaults line up with the generated demo user
+- `identity.id_field` matches the domain's primary ID field (e.g. `"patient_id"`, `"customer_id"`)
+- `get_internal_tool_definitions` returns at least `get_current_user_profile`, `get_current_time`, and `dataset_overview`
+- `execute_internal_tool` handles all three tool names
 
 ## `schema.py`
 
@@ -19,10 +22,18 @@ Use this checklist after scaffolding a domain.
 - Redis key templates use the domain namespace
 - vector fields declare `vector_dim` and `distance_metric`
 
+## `prompt.py`
+
+- includes a rule that all `filter_*` / `search_*` MCP tools take a `value` parameter
+- includes tool discovery hints for the available MCP tools
+- includes common workflows (sequences of tool calls)
+- instructs the agent to call `get_current_user_profile` first
+
 ## `data_generator.py`
 
 - writes all files declared by the schema
 - returns `GeneratedDataset`
+- `update_env_file` defaults to `False`; only `main()` passes `True`
 - updates demo identity env vars when the demo uses a signed-in user
 - creates records that support the documented flagship demo paths
 

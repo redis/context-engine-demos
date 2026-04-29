@@ -91,6 +91,7 @@ class HealthcareDomain:
             answer_system_prompt="Answer using only the provided documents.",
         ),
         identity=IdentityConfig(
+            id_field="patient_id",
             default_id="P001",
             default_name="John Smith",
             default_email="john.smith@email.com",
@@ -133,13 +134,52 @@ class HealthcareDomain:
         runtime_config: dict[str, Any] | None = None,
     ) -> Sequence[InternalToolDefinition]:
         del runtime_config
-        return ()
+        return (
+            InternalToolDefinition(
+                name=self.manifest.identity.tool_name,
+                description=self.manifest.identity.description,
+            ),
+            InternalToolDefinition(
+                name="get_current_time",
+                description=(
+                    "Returns the current date and time in UTC (ISO 8601). "
+                    "Use this to compare against appointment dates and referral timelines."
+                ),
+            ),
+            InternalToolDefinition(
+                name="dataset_overview",
+                description=(
+                    "Returns counts for the current healthcare demo dataset, including "
+                    "locations, providers, patients, appointments, referrals, and waitlist entries."
+                ),
+            ),
+        )
 
     def execute_internal_tool(
         self, tool_name: str, arguments: dict[str, Any], settings: Any
     ) -> dict[str, Any]:
-        del tool_name, arguments, settings
-        return {}
+        import os
+        from datetime import datetime, timezone
+
+        if tool_name == self.manifest.identity.tool_name:
+            identity = self.manifest.identity
+            return {
+                identity.id_field: os.getenv(identity.id_env_var, identity.default_id),
+                "name": os.getenv(identity.name_env_var, identity.default_name),
+                "email": os.getenv(identity.email_env_var, identity.default_email),
+            }
+        if tool_name == "get_current_time":
+            return {"current_time": datetime.now(timezone.utc).isoformat()}
+        if tool_name == "dataset_overview":
+            return {
+                "locations": 2,
+                "providers": 5,
+                "patients": 8,
+                "appointments": 10,
+                "referrals": 6,
+                "waitlist": 4,
+            }
+        return {"error": f"Unknown tool: {tool_name}"}
 
     def write_dataset_meta(
         self, *, settings: Any, records: dict[str, list[dict[str, Any]]]
@@ -152,7 +192,7 @@ class HealthcareDomain:
         *,
         output_dir: Path,
         seed: int | None = None,
-        update_env_file: bool = True,
+        update_env_file: bool = False,
     ) -> GeneratedDataset:
         return generate_demo_data(output_dir=output_dir, seed=seed, update_env_file=update_env_file)
 

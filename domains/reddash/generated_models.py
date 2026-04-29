@@ -61,7 +61,7 @@ class Customer(ContextModel):
         description="ISO timestamp of account creation",
     )
 
-    orders: list[Order] = ContextRelationship(
+    orders: Order = ContextRelationship(
         description="Orders placed by this customer",
         source_field="customer_id",
     )
@@ -113,7 +113,7 @@ class Restaurant(ContextModel):
         index="tag",
     )
 
-    orders: list[Order] = ContextRelationship(
+    orders: Order = ContextRelationship(
         description="Orders from this restaurant",
         source_field="restaurant_id",
     )
@@ -265,7 +265,7 @@ class Order(ContextModel):
         source_field="restaurant_id",
     )
 
-    driver: Driver | None = ContextRelationship(
+    driver: Driver = ContextRelationship(
         description="Driver delivering the order",
         source_field="driver_id",
     )
@@ -498,7 +498,7 @@ class SupportTicket(ContextModel):
         source_field="customer_id",
     )
 
-    order: Order | None = ContextRelationship(
+    order: Order = ContextRelationship(
         description="Related order",
         source_field="order_id",
     )
@@ -534,5 +534,5 @@ class Policy(ContextModel):
         description="Vector embedding of policy content",
         index="vector",
         vector_dim=1536,
-        distance_metric="cosine",
+        distance_metric="COSINE",
     )
