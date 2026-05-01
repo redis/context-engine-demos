@@ -308,9 +308,20 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
 
 async def rag_event_stream(question: str) -> AsyncIterator[str]:
     timer = Timer()
-    async for chunk in rag_service.stream_answer(question, timer):
-        yield chunk
-    yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
+    try:
+        async for chunk in rag_service.stream_answer(question, timer):
+            yield chunk
+        yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
+    except Exception as exc:
+        code, message = classify_openai_exception(exc)
+        error_code = "budget_exceeded" if code == "budget_exceeded" else "openai_error"
+        yield format_sse_event(
+            "error",
+            errorCode=error_code,
+            message=message,
+            ts=timer.elapsed_ms(),
+        )
+        yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
 
 
 @app.post("/api/chat/stream")
