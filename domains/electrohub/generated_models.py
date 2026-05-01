@@ -57,12 +57,12 @@ class Customer(ContextModel):
         description="ISO timestamp for account creation",
     )
 
-    orders: Order = ContextRelationship(
+    orders: list[Order] = ContextRelationship(
         description="Orders placed by this customer",
         source_field="customer_id",
     )
 
-    support_cases: SupportCase = ContextRelationship(
+    support_cases: list[SupportCase] = ContextRelationship(
         description="Support cases opened by this customer",
         source_field="customer_id",
     )
@@ -560,5 +560,5 @@ class Guide(ContextModel):
         description="Vector embedding for the guide content",
         index="vector",
         vector_dim=1536,
-        distance_metric="COSINE",
+        distance_metric="cosine",
     )

@@ -34,7 +34,8 @@ def render_field(field: FieldSpec) -> str:
     if field.vector_dim is not None:
         lines.append(f"        vector_dim={field.vector_dim},")
     if field.distance_metric is not None:
-        lines.append(f'        distance_metric="{field.distance_metric}",')
+        # Must match backend/app/core/domain_schema.validate_entity_specs (lowercase only).
+        lines.append(f'        distance_metric="{field.distance_metric.lower()}",')
     lines.append("    )")
     return "\n".join(lines)
 
