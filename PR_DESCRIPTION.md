@@ -21,6 +21,11 @@ When LiteLLM returns HTTP 400 with `error.type == "budget_exceeded"`, the chat s
 | [`backend/app/sse.py`](backend/app/sse.py) | Document **`error`** / **`done`** in `format_sse_event` docstring. |
 | [`frontend/src/App.tsx`](frontend/src/App.tsx) + [`frontend/src/styles.css`](frontend/src/styles.css) | Handle **`type === "error"`**; banner for **`budget_exceeded`**. Loading clears on **`done`** as before. |
 
+### Model codegen / validation
+
+- Regenerated **`domains/reddash/generated_models.py`** and **`domains/electrohub/generated_models.py`** so vector fields use lowercase **`distance_metric="cosine"`**, matching **`validate_entity_specs`** (`backend/app/core/domain_schema.py`).
+- **`scripts/generate_models.py`** always emits **`distance_metric`** in lowercase to avoid manual edits drifting to invalid values (e.g. `COSINE`).
+
 ## SSE contract
 
 - **`data: {"type":"error","errorCode":"budget_exceeded"|"openai_error","message":"...","ts":...}`**
