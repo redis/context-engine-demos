@@ -17,6 +17,7 @@ from backend.app.core.domain_loader import get_active_domain
 from backend.app.contracts import ChatRequest
 from backend.app.internal_tools import InternalToolService, domain_runtime_config, internal_tool_names
 from backend.app.langgraph_agent import create_agent, create_checkpointer
+from backend.app.openai_errors import classify_openai_exception
 from backend.app.rag_service import SimpleRAGService
 from backend.app.sse import format_sse_event
 from backend.app.settings import get_settings
@@ -180,118 +181,129 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
     tool_calls_seen = 0
     last_thinking_step: str | None = None
 
-    async for event in agent.astream_events(
-        {"messages": [{"role": "user", "content": latest_message}]},
-        config=config,
-        version="v2",
-    ):
-        kind = event["event"]
+    try:
+        async for event in agent.astream_events(
+            {"messages": [{"role": "user", "content": latest_message}]},
+            config=config,
+            version="v2",
+        ):
+            kind = event["event"]
 
-        if kind == "on_tool_start":
-            name = event.get("name", "")
-            tool_input = event["data"].get("input", {})
-            tool_start_times[event["run_id"]] = perf_counter()
-            tool_calls_seen += 1
-            thinking_step = _thinking_step_for_tool(name, tool_input)
-            if thinking_step and thinking_step != last_thinking_step:
-                last_thinking_step = thinking_step
-                yield format_sse_event("thinking-step", step=thinking_step, ts=timer.elapsed_ms())
-            yield format_sse_event(
-                "tool-call",
-                toolName=name,
-                toolKind=_tool_kind(name),
-                runId=event["run_id"],
-                payload=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
-                ts=timer.elapsed_ms(),
-            )
+            if kind == "on_tool_start":
+                name = event.get("name", "")
+                tool_input = event["data"].get("input", {})
+                tool_start_times[event["run_id"]] = perf_counter()
+                tool_calls_seen += 1
+                thinking_step = _thinking_step_for_tool(name, tool_input)
+                if thinking_step and thinking_step != last_thinking_step:
+                    last_thinking_step = thinking_step
+                    yield format_sse_event("thinking-step", step=thinking_step, ts=timer.elapsed_ms())
+                yield format_sse_event(
+                    "tool-call",
+                    toolName=name,
+                    toolKind=_tool_kind(name),
+                    runId=event["run_id"],
+                    payload=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
+                    ts=timer.elapsed_ms(),
+                )
 
-        elif kind == "on_tool_end":
-            name = event.get("name", "")
-            raw_output = event["data"].get("output", "")
-            try:
-                output = json.loads(str(raw_output)) if raw_output else {}
-            except (json.JSONDecodeError, TypeError):
-                output = {"result": str(raw_output)}
-            start = tool_start_times.pop(event["run_id"], perf_counter())
-            duration_ms = max(round((perf_counter() - start) * 1000), 1)
-            yield format_sse_event(
-                "tool-result",
-                toolName=name,
-                toolKind=_tool_kind(name),
-                runId=event["run_id"],
-                payload=output,
-                durationMs=duration_ms,
-                ts=timer.elapsed_ms(),
-            )
+            elif kind == "on_tool_end":
+                name = event.get("name", "")
+                raw_output = event["data"].get("output", "")
+                try:
+                    output = json.loads(str(raw_output)) if raw_output else {}
+                except (json.JSONDecodeError, TypeError):
+                    output = {"result": str(raw_output)}
+                start = tool_start_times.pop(event["run_id"], perf_counter())
+                duration_ms = max(round((perf_counter() - start) * 1000), 1)
+                yield format_sse_event(
+                    "tool-result",
+                    toolName=name,
+                    toolKind=_tool_kind(name),
+                    runId=event["run_id"],
+                    payload=output,
+                    durationMs=duration_ms,
+                    ts=timer.elapsed_ms(),
+                )
 
-        elif kind == "on_chat_model_start":
-            if not settings.show_llm_trace_steps:
-                continue
-            llm_call_counter += 1
-            llm_start_times[event["run_id"]] = perf_counter()
-            step_id = f"llm-step-{llm_call_counter}"
-            llm_step_ids[event["run_id"]] = step_id
-            step = _llm_phase_label(llm_call_index=llm_call_counter, tool_calls_seen=tool_calls_seen)
-            last_thinking_step = step
+            elif kind == "on_chat_model_start":
+                if not settings.show_llm_trace_steps:
+                    continue
+                llm_call_counter += 1
+                llm_start_times[event["run_id"]] = perf_counter()
+                step_id = f"llm-step-{llm_call_counter}"
+                llm_step_ids[event["run_id"]] = step_id
+                step = _llm_phase_label(llm_call_index=llm_call_counter, tool_calls_seen=tool_calls_seen)
+                last_thinking_step = step
+                yield format_sse_event(
+                    "thinking-step",
+                    step=step,
+                    stepId=step_id,
+                    stepKind="llm",
+                    ts=timer.elapsed_ms(),
+                )
+
+            elif kind == "on_chat_model_end":
+                if not settings.show_llm_trace_steps:
+                    continue
+                start = llm_start_times.pop(event["run_id"], perf_counter())
+                step_id = llm_step_ids.pop(event["run_id"], "")
+                duration_ms = max(round((perf_counter() - start) * 1000), 1)
+                if step_id:
+                    yield format_sse_event(
+                        "thinking-step-finish",
+                        stepId=step_id,
+                        durationMs=duration_ms,
+                        durationText=_format_elapsed_ms(duration_ms),
+                        ts=timer.elapsed_ms(),
+                    )
+                else:
+                    yield format_sse_event(
+                        "status",
+                        text=f"LLM step completed in {_format_elapsed_ms(duration_ms)}",
+                        ts=timer.elapsed_ms(),
+                    )
+
+            elif kind == "on_chat_model_stream":
+                if defer_final_answer:
+                    # Defer rendering assistant text until the graph finishes so the
+                    # verifier hook can rewrite the final answer if needed.
+                    continue
+                chunk = event["data"].get("chunk")
+                if chunk and hasattr(chunk, "content") and chunk.content:
+                    if not (hasattr(chunk, "tool_calls") and chunk.tool_calls):
+                        yield format_sse_event("text-delta", delta=chunk.content)
+
+        if defer_final_answer and settings.show_final_verifier_trace_step:
             yield format_sse_event(
                 "thinking-step",
-                step=step,
-                stepId=step_id,
-                stepKind="llm",
+                step="Validate the final answer against recent context and tool results.",
                 ts=timer.elapsed_ms(),
             )
+            yield format_sse_event("status", text="Verifying final answer…", ts=timer.elapsed_ms())
 
-        elif kind == "on_chat_model_end":
-            if not settings.show_llm_trace_steps:
-                continue
-            start = llm_start_times.pop(event["run_id"], perf_counter())
-            step_id = llm_step_ids.pop(event["run_id"], "")
-            duration_ms = max(round((perf_counter() - start) * 1000), 1)
-            if step_id:
-                yield format_sse_event(
-                    "thinking-step-finish",
-                    stepId=step_id,
-                    durationMs=duration_ms,
-                    durationText=_format_elapsed_ms(duration_ms),
-                    ts=timer.elapsed_ms(),
-                )
-            else:
-                yield format_sse_event(
-                    "status",
-                    text=f"LLM step completed in {_format_elapsed_ms(duration_ms)}",
-                    ts=timer.elapsed_ms(),
-                )
-
-        elif kind == "on_chat_model_stream":
-            if defer_final_answer:
-                # Defer rendering assistant text until the graph finishes so the
-                # verifier hook can rewrite the final answer if needed.
-                continue
-            chunk = event["data"].get("chunk")
-            if chunk and hasattr(chunk, "content") and chunk.content:
-                if not (hasattr(chunk, "tool_calls") and chunk.tool_calls):
-                    yield format_sse_event("text-delta", delta=chunk.content)
-
-    if defer_final_answer and settings.show_final_verifier_trace_step:
+        if defer_final_answer:
+            final_text = ""
+            if hasattr(agent, "aget_state"):
+                snapshot = await agent.aget_state(config)
+                messages = snapshot.values.get("messages", []) if snapshot and snapshot.values else []
+                for msg in reversed(messages):
+                    if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
+                        final_text = msg.content if isinstance(msg.content, str) else str(msg.content)
+                        break
+            if final_text:
+                yield format_sse_event("text-delta", delta=final_text)
+        yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
+    except Exception as exc:
+        code, message = classify_openai_exception(exc)
+        error_code = "budget_exceeded" if code == "budget_exceeded" else "openai_error"
         yield format_sse_event(
-            "thinking-step",
-            step="Validate the final answer against recent context and tool results.",
+            "error",
+            errorCode=error_code,
+            message=message,
             ts=timer.elapsed_ms(),
         )
-        yield format_sse_event("status", text="Verifying final answer…", ts=timer.elapsed_ms())
-
-    if defer_final_answer:
-        final_text = ""
-        if hasattr(agent, "aget_state"):
-            snapshot = await agent.aget_state(config)
-            messages = snapshot.values.get("messages", []) if snapshot and snapshot.values else []
-            for msg in reversed(messages):
-                if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
-                    final_text = msg.content if isinstance(msg.content, str) else str(msg.content)
-                    break
-        if final_text:
-            yield format_sse_event("text-delta", delta=final_text)
-    yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
+        yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
 
 
 async def rag_event_stream(question: str) -> AsyncIterator[str]:
