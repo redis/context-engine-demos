@@ -10,6 +10,7 @@ from uuid import uuid4
 from openai import AsyncOpenAI
 
 from backend.app.context_surface_service import ContextSurfaceService
+from backend.app.openai_errors import classify_openai_exception
 from backend.app.core.domain_loader import get_active_domain
 from backend.app.sse import format_sse_event
 from backend.app.settings import Settings
@@ -55,7 +56,10 @@ class SimpleRAGService:
         self.settings = settings
         self.cs_service = cs_service
         self.domain = get_active_domain(settings)
-        self.openai = AsyncOpenAI(api_key=settings.openai_api_key)
+        client_kw: dict[str, Any] = {"api_key": settings.openai_api_key}
+        if settings.openai_base_url:
+            client_kw["base_url"] = settings.openai_base_url
+        self.openai = AsyncOpenAI(**client_kw)
         self._vector_tool_name: str | None = None
         self._text_tool_name: str | None = None
 
@@ -135,7 +139,18 @@ class SimpleRAGService:
         rag = self.domain.manifest.rag
         tool_run_id = str(uuid4())
         yield format_sse_event("status", text="Embedding query…", ts=timer.elapsed_ms())
-        embedding = await self._embed(question)
+        try:
+            embedding = await self._embed(question)
+        except Exception as exc:
+            code, msg = classify_openai_exception(exc)
+            error_code = "budget_exceeded" if code == "budget_exceeded" else "openai_error"
+            yield format_sse_event(
+                "error",
+                errorCode=error_code,
+                message=msg,
+                ts=timer.elapsed_ms(),
+            )
+            return
 
         yield format_sse_event("status", text=rag.status_text, ts=timer.elapsed_ms())
         yield format_sse_event(
@@ -208,5 +223,12 @@ class SimpleRAGService:
                 delta = chunk.choices[0].delta.content or ""
                 if delta:
                     yield format_sse_event("text-delta", delta=delta)
-        except Exception:
-            yield format_sse_event("text-delta", delta="Sorry, I wasn't able to generate a response. Please try again.")
+        except Exception as exc:
+            code, msg = classify_openai_exception(exc)
+            error_code = "budget_exceeded" if code == "budget_exceeded" else "openai_error"
+            yield format_sse_event(
+                "error",
+                errorCode=error_code,
+                message=msg,
+                ts=timer.elapsed_ms(),
+            )
