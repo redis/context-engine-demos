@@ -102,8 +102,8 @@ def _create_surface(
                 "password": redis_password,
                 "db": redis_db,
                 "tls_enabled": redis_ssl,
-                "pool_size": 10,
-                "min_idle_conns": 2,
+                "pool_size": 2,
+                "min_idle_conns": 0,
             },
         },
     }
