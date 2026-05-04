@@ -20,16 +20,18 @@ Follow-ups:
 Expected tool sequence:
 1. `get_current_user_profile`
 2. `filter_booking_by_customer_id`
-3. `filter_flightsegment_by_booking_id`
-4. `filter_operationaldisruption_by_booking_id` or `filter_operationaldisruption_by_customer_id`
-5. `filter_reaccommodationrecord_by_booking_id` or `filter_reaccommodationrecord_by_customer_id`
-6. `search_travelpolicydoc_by_text(value="rebooking after cancellation")` when the user asks about options or rules
+3. `filter_itinerarysegment_by_booking_id`
+4. `filter_operatingflight_by_operating_flight_id` using the itinerary segment's `operating_flight_id`
+5. `filter_operationaldisruption_by_operating_flight_id`
+6. `filter_reaccommodationrecord_by_booking_id` or `filter_reaccommodationrecord_by_customer_id`
+7. `search_travelpolicydoc_by_text(value="rebooking after cancellation")` when the user asks about options or rules
 
 Required supporting records:
 - `CustomerProfile`: `AIRCUST_001`
 - `Booking`: `BOOK_001` / locator `ZX73QF`
-- `FlightSegment`: cancelled original `SEG_001` / `ZX402`
-- `FlightSegment`: updated `SEG_002` / `ZX406`
+- `ItinerarySegment`: cancelled original `SEG_001` / `ZX402`
+- `ItinerarySegment`: updated `SEG_002` / `ZX406`
+- `OperatingFlight`: `OF_001` and `OF_002`
 - `OperationalDisruption`: `OD_001`
 - `ReaccommodationRecord`: `REAC_001`
 
@@ -56,12 +58,14 @@ Expected tool sequence:
 1. `get_current_user_profile`
 2. `filter_booking_by_customer_id`
 3. `get_current_time`
-4. `filter_flightsegment_by_booking_id`
+4. `filter_itinerarysegment_by_booking_id`
+5. `filter_operatingflight_by_operating_flight_id`
 
 Required supporting records:
 - `CustomerProfile`: `AIRCUST_001`
 - `Booking`: `BOOK_002` / locator `ZX19MP`
-- `FlightSegment`: `SEG_003` / `ZX018`
+- `ItinerarySegment`: `SEG_003` / `ZX018`
+- `OperatingFlight`: `OF_003`
 
 Expected assistant behavior:
 - Treat a generic `Flight status` question as a request about the traveller's next relevant unaffected trip.

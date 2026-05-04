@@ -56,9 +56,9 @@ class AirlineSupportDomain:
         generated_models_path="domains/airline-support/generated_models.py",
         output_dir="output/airline-support",
         branding=BrandingConfig(
-            app_name="Airline Support",
+            app_name="Aurora Air",
             subtitle="Digital assistant",
-            hero_title="Travel assistant",
+            hero_title="Aurora Air",
             placeholder_text="Ask about your trip",
             logo_path="domains/airline-support/assets/logo.svg",
             starter_prompts=[
@@ -183,10 +183,14 @@ class AirlineSupportDomain:
             return "Check the current airline demo coverage before reasoning about available records."
         if tool_name.startswith("filter_booking_by_customer_id"):
             return "Load the traveller's bookings and find the most relevant trip for this question."
-        if tool_name.startswith("filter_flightsegment_by_booking_id"):
+        if tool_name.startswith("filter_itinerarysegment_by_booking_id"):
             return "Inspect the exact itinerary segments for the selected booking."
-        if tool_name.startswith("filter_flightsegment_by_flight_number"):
-            return f"Look up the live segment record for flight {detail or 'the requested flight'}."
+        if tool_name.startswith("filter_itinerarysegment_by_flight_number"):
+            return f"Look up the booked itinerary segment for flight {detail or 'the requested flight'}."
+        if tool_name.startswith("filter_operatingflight_by_operating_flight_id"):
+            return "Read the shared operating flight record for the selected itinerary segment."
+        if tool_name.startswith("filter_operatingflight_by_flight_number"):
+            return f"Read the shared operating flight record for flight {detail or 'the requested flight'}."
         if tool_name.startswith("filter_operationaldisruption_by_"):
             return "Read the operational disruption event so the answer reflects what happened to the flight."
         if tool_name.startswith("filter_reaccommodationrecord_by_"):
@@ -218,8 +222,8 @@ class AirlineSupportDomain:
             InternalToolDefinition(
                 name="dataset_overview",
                 description=(
-                    "Returns record counts for the airline demo dataset, including profiles, bookings, segments, "
-                    "operational disruptions, reaccommodation records, support cases, and travel policy documents."
+                    "Returns record counts for the airline demo dataset, including profiles, bookings, itinerary segments, "
+                    "operating flights, operational disruptions, reaccommodation records, support cases, and travel policy documents."
                 ),
             ),
         )
@@ -262,7 +266,8 @@ class AirlineSupportDomain:
         summary = {
             "customer_profiles": len(records.get("CustomerProfile", [])),
             "bookings": len(records.get("Booking", [])),
-            "flight_segments": len(records.get("FlightSegment", [])),
+            "itinerary_segments": len(records.get("ItinerarySegment", [])),
+            "operating_flights": len(records.get("OperatingFlight", [])),
             "operational_disruptions": len(records.get("OperationalDisruption", [])),
             "reaccommodation_records": len(records.get("ReaccommodationRecord", [])),
             "support_cases": len(records.get("SupportCase", [])),

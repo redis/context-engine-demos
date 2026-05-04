@@ -20,8 +20,8 @@ def test_airline_support_domain_loads(monkeypatch) -> None:
     domain = load_domain("airline-support")
     assert domain.manifest.id == "airline-support"
     assert Path(domain.manifest.branding.logo_path).exists()
-    assert domain.manifest.branding.app_name == "Airline Support"
-    assert domain.manifest.branding.hero_title == "Travel assistant"
+    assert domain.manifest.branding.app_name == "Aurora Air"
+    assert domain.manifest.branding.hero_title == "Aurora Air"
     assert [card.title for card in domain.manifest.branding.starter_prompts] == [
         "Flight status",
         "Delays and cancellations",
@@ -66,9 +66,14 @@ def test_airline_support_data_generator_writes_expected_files(tmp_path: Path) ->
         for line in (tmp_path / "bookings.jsonl").read_text().splitlines()
         if line.strip()
     ]
+    operating_flight_rows = [
+        json.loads(line)
+        for line in (tmp_path / "operating_flights.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
     segment_rows = [
         json.loads(line)
-        for line in (tmp_path / "flight_segments.jsonl").read_text().splitlines()
+        for line in (tmp_path / "itinerary_segments.jsonl").read_text().splitlines()
         if line.strip()
     ]
     policy_rows = [
@@ -93,9 +98,21 @@ def test_airline_support_data_generator_writes_expected_files(tmp_path: Path) ->
     assert "formatted_birth_dt" not in profile_blob
 
     assert any(row["booking_locator"] == "ZX73QF" for row in booking_rows)
-    assert any(row["operating_status"] == "cancelled" for row in segment_rows)
+    assert all("journey_summary" not in row for row in booking_rows)
+    assert all("current_itinerary_summary" not in row for row in booking_rows)
+    assert all("disruption_state" not in row for row in booking_rows)
+    assert any(row["operating_status"] == "cancelled" for row in operating_flight_rows)
+    assert all("operating_status" not in row for row in segment_rows)
+    assert all("estimated_departure" not in row for row in segment_rows)
     assert any(row["segment_role"] == "updated" for row in segment_rows)
     assert any(row["category"] == "disruptions" for row in policy_rows)
     assert any("automatically rebooked" in row["content"].lower() for row in policy_rows)
+    assert operational_disruption_rows[0]["operating_flight_id"] == "OF_001"
+    assert "disruption_reason_code" in operational_disruption_rows[0]
+    assert "operational_reason" not in operational_disruption_rows[0]
+    assert "customer_id" not in operational_disruption_rows[0]
+    assert "booking_id" not in operational_disruption_rows[0]
+    assert operational_disruption_rows[0]["disrupted_flight_number"] == "ZX402"
     assert operational_disruption_rows[0]["impact_status"] == "cancelled"
     assert reaccommodation_rows[0]["reaccommodation_status"] == "confirmed"
+    assert reaccommodation_rows[0]["reaccommodation_reason_code"] == "SAME_DAY_ALT_ASSIGNED"

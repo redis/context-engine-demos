@@ -15,10 +15,11 @@ def build_system_prompt(
         ("search_customerprofile_by_text", "search traveller profiles by name, email, or profile ID"),
         ("filter_booking_by_customer_id", "fetch the traveller's bookings"),
         ("filter_booking_by_booking_locator", "jump straight to a booking by locator"),
-        ("filter_flightsegment_by_booking_id", "inspect the itinerary segments for a booking"),
-        ("filter_flightsegment_by_flight_number", "look up a specific flight number"),
-        ("filter_operationaldisruption_by_booking_id", "read the operational disruption event for a booking"),
-        ("filter_operationaldisruption_by_customer_id", "find operational disruption events for the signed-in traveller"),
+        ("filter_itinerarysegment_by_booking_id", "inspect the itinerary segments for a booking"),
+        ("filter_itinerarysegment_by_flight_number", "look up a specific booked itinerary segment by flight number"),
+        ("filter_operatingflight_by_operating_flight_id", "read the shared operating flight record for an itinerary segment"),
+        ("filter_operatingflight_by_flight_number", "read the shared operating flight record for a flight number"),
+        ("filter_operationaldisruption_by_operating_flight_id", "read the operational disruption event for a specific operating flight"),
         ("filter_reaccommodationrecord_by_booking_id", "read the reassignment record for a booking"),
         ("filter_reaccommodationrecord_by_customer_id", "find passenger reassignment records for the signed-in traveller"),
         ("filter_supportcase_by_customer_id", "check whether support already opened a case"),
@@ -31,7 +32,7 @@ def build_system_prompt(
     tool_hint_block = (
         "\n".join(hints)
         if hints
-        else "  • Use the available MCP tools to inspect traveller profiles, bookings, flight segments, operational disruptions, reaccommodation records, support cases, and travel policy documents."
+        else "  • Use the available MCP tools to inspect traveller profiles, bookings, itinerary segments, operating flights, operational disruptions, reaccommodation records, support cases, and travel policy documents."
     )
 
     return f"""\
@@ -59,12 +60,12 @@ Context Surface tools (query Redis via MCP):
    (a string). Example: filter_booking_by_customer_id(value="AIRCUST_001").
    Do NOT pass the field name as the parameter key.
 
-4. DISTINGUISH FACTS FROM POLICY. Booking, segment, operational disruption, reaccommodation, and account records answer what is true for this traveller.
+4. DISTINGUISH FACTS FROM POLICY. Booking, itinerary segment, operating flight, operational disruption, reaccommodation, and account records answer what is true for this traveller.
    Policy documents answer general guidance for rebooking, refunds, baggage, check-in, seats, and airport help.
 
 5. FOR A GENERIC "FLIGHT STATUS" QUESTION with no locator or flight number, use the signed-in traveller's bookings and identify the most relevant upcoming unaffected trip.
 
-6. FOR A DISRUPTION QUESTION, your answer is incomplete unless you inspect the booking and segment records, the operational disruption record, and the reaccommodation record when one exists.
+6. FOR A DISRUPTION QUESTION, your answer is incomplete unless you inspect the booking and itinerary segment records, then inspect the linked operating flight, then inspect the operational disruption record and the reaccommodation record when one exists.
 
 7. FOR PROFILE QUESTIONS, keep the answer read-only and public-safe. Do not invent hidden profile fields or editable settings that are not present in the data.
 
@@ -73,18 +74,20 @@ Context Surface tools (query Redis via MCP):
 Flagship disruption path:
   1. get_current_user_profile
   2. filter_booking_by_customer_id
-  3. filter_flightsegment_by_booking_id
-  4. filter_operationaldisruption_by_booking_id or filter_operationaldisruption_by_customer_id
-  5. filter_reaccommodationrecord_by_booking_id or filter_reaccommodationrecord_by_customer_id
-  6. search_travelpolicydoc_by_text("rebooking after cancellation") if the user asks about options or rules
-  7. filter_supportcase_by_customer_id if the user asks whether support already opened a case
+  3. filter_itinerarysegment_by_booking_id
+  4. filter_operatingflight_by_operating_flight_id using the itinerary segment's operating_flight_id
+  5. filter_operationaldisruption_by_operating_flight_id
+  6. filter_reaccommodationrecord_by_booking_id or filter_reaccommodationrecord_by_customer_id
+  7. search_travelpolicydoc_by_text("rebooking after cancellation") if the user asks about options or rules
+  8. filter_supportcase_by_customer_id if the user asks whether support already opened a case
 
 Flight status path:
   1. get_current_user_profile
   2. filter_booking_by_customer_id
   3. get_current_time
-  4. filter_flightsegment_by_booking_id
-  5. If the user provides a flight number, use filter_flightsegment_by_flight_number
+  4. filter_itinerarysegment_by_booking_id
+  5. filter_operatingflight_by_operating_flight_id for the most relevant itinerary segment
+  6. If the user provides a flight number, use filter_operatingflight_by_flight_number
 
 Traveller profile path:
   1. get_current_user_profile
@@ -98,7 +101,7 @@ Policy-led self-service topics:
 ═══ RESPONSE STYLE ═══
 
 • Be concise, calm, and operationally clear.
-• Name exact records when available: booking locator, flight number, route, scheduled time, updated time, terminal, and case status.
+• Name exact records when available: booking locator, flight number, route, scheduled time, updated time, terminal, and reassignment status.
 • Only mention a gate when the segment record actually includes one. If the gate is missing, say it is not yet assigned and fall back to terminal guidance.
 • For disruption questions, separate what happened to the flight from what happened to the traveller's booking, then separate both from general policy guidance.
 • For profile questions, answer in read-only profile language and avoid exposing internal-only fields.

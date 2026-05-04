@@ -98,17 +98,6 @@ class Booking(ContextModel):
         index="tag",
     )
 
-    journey_summary: str = ContextField(
-        description="Original trip summary",
-        index="text",
-        weight=1.8,
-    )
-
-    current_itinerary_summary: str = ContextField(
-        description="Current itinerary summary after any changes",
-        index="text",
-    )
-
     created_at: str = ContextField(
         description="Booking creation timestamp",
     )
@@ -123,18 +112,8 @@ class Booking(ContextModel):
         index="tag",
     )
 
-    disruption_state: str = ContextField(
-        description="Current disruption state",
-        index="tag",
-    )
-
-    segments: list[FlightSegment] = ContextRelationship(
-        description="Segments belonging to this booking",
-        source_field="booking_id",
-    )
-
-    operational_disruptions: list[OperationalDisruption] = ContextRelationship(
-        description="Operational disruption events tied to this booking",
+    itinerary_segments: list[ItinerarySegment] = ContextRelationship(
+        description="Booked itinerary segments belonging to this booking",
         source_field="booking_id",
     )
 
@@ -149,13 +128,13 @@ class Booking(ContextModel):
     )
 
 
-class FlightSegment(ContextModel):
-    """FlightSegment entity for the Airline Support domain."""
+class ItinerarySegment(ContextModel):
+    """ItinerarySegment entity for the Airline Support domain."""
 
-    __redis_key_template__ = "airline_support_flight_segment:{segment_id}"
+    __redis_key_template__ = "airline_support_itinerary_segment:{segment_id}"
 
     segment_id: str = ContextField(
-        description="Unique flight segment identifier",
+        description="Unique itinerary segment identifier",
         is_key_component=True,
     )
 
@@ -164,8 +143,18 @@ class FlightSegment(ContextModel):
         index="tag",
     )
 
+    segment_sequence: int = ContextField(
+        description="Position of the segment in the itinerary",
+    )
+
+    operating_flight_id: str = ContextField(
+        description="Linked operating flight identifier",
+        index="tag",
+        no_stem=True,
+    )
+
     flight_number: str = ContextField(
-        description="Marketing flight number",
+        description="Booked marketing flight number",
         index="tag",
         no_stem=True,
     )
@@ -199,6 +188,61 @@ class FlightSegment(ContextModel):
         description="Scheduled departure timestamp",
     )
 
+    scheduled_arrival: str = ContextField(
+        description="Scheduled arrival timestamp",
+    )
+
+    cabin: str = ContextField(
+        description="Cabin on the segment",
+        index="tag",
+    )
+
+    booking: Booking = ContextRelationship(
+        description="Booking containing this segment",
+        source_field="booking_id",
+    )
+
+    operating_flight: OperatingFlight = ContextRelationship(
+        description="Operating flight linked to this itinerary segment",
+        source_field="operating_flight_id",
+    )
+
+
+class OperatingFlight(ContextModel):
+    """OperatingFlight entity for the Airline Support domain."""
+
+    __redis_key_template__ = "airline_support_operating_flight:{operating_flight_id}"
+
+    operating_flight_id: str = ContextField(
+        description="Unique operating flight identifier",
+        is_key_component=True,
+    )
+
+    flight_number: str = ContextField(
+        description="Operating flight number",
+        index="tag",
+        no_stem=True,
+    )
+
+    service_date: str = ContextField(
+        description="Operating flight service date",
+        index="tag",
+    )
+
+    origin_airport: str = ContextField(
+        description="Origin airport code",
+        index="tag",
+    )
+
+    destination_airport: str = ContextField(
+        description="Destination airport code",
+        index="tag",
+    )
+
+    scheduled_departure: str = ContextField(
+        description="Scheduled departure timestamp",
+    )
+
     estimated_departure: str = ContextField(
         description="Current estimated departure timestamp",
     )
@@ -212,7 +256,7 @@ class FlightSegment(ContextModel):
     )
 
     operating_status: str = ContextField(
-        description="Current segment operating status",
+        description="Current operating flight status",
         index="tag",
     )
 
@@ -224,19 +268,9 @@ class FlightSegment(ContextModel):
         description="Departure gate if assigned close to departure",
     )
 
-    cabin: str = ContextField(
-        description="Cabin on the segment",
+    status_source: str = ContextField(
+        description="System providing current flight status",
         index="tag",
-    )
-
-    status_note: str = ContextField(
-        description="Short traveller-facing status note",
-        index="text",
-    )
-
-    booking: Booking = ContextRelationship(
-        description="Booking containing this segment",
-        source_field="booking_id",
     )
 
 
@@ -250,19 +284,34 @@ class OperationalDisruption(ContextModel):
         is_key_component=True,
     )
 
-    customer_id: str = ContextField(
-        description="Customer identifier",
+    operating_flight_id: str = ContextField(
+        description="Linked operating flight identifier",
+        index="tag",
+        no_stem=True,
+    )
+
+    disrupted_flight_number: str = ContextField(
+        description="Disrupted flight number",
+        index="tag",
+        no_stem=True,
+    )
+
+    origin_airport: str = ContextField(
+        description="Origin airport code",
         index="tag",
     )
 
-    booking_id: str = ContextField(
-        description="Affected booking identifier",
+    destination_airport: str = ContextField(
+        description="Destination airport code",
         index="tag",
     )
 
-    affected_segment_id: str = ContextField(
-        description="Cancelled or delayed segment identifier",
-        index="tag",
+    scheduled_departure: str = ContextField(
+        description="Scheduled departure timestamp",
+    )
+
+    scheduled_arrival: str = ContextField(
+        description="Scheduled arrival timestamp",
     )
 
     disruption_type: str = ContextField(
@@ -270,9 +319,14 @@ class OperationalDisruption(ContextModel):
         index="tag",
     )
 
-    operational_reason: str = ContextField(
-        description="Operational cause summary",
-        index="text",
+    disruption_reason_code: str = ContextField(
+        description="Operational disruption reason code",
+        index="tag",
+    )
+
+    disruption_reason_category: str = ContextField(
+        description="Operational disruption reason category",
+        index="tag",
     )
 
     impact_status: str = ContextField(
@@ -289,14 +343,9 @@ class OperationalDisruption(ContextModel):
         index="tag",
     )
 
-    booking: Booking = ContextRelationship(
-        description="Booking tied to this disruption",
-        source_field="booking_id",
-    )
-
-    affected_segment: FlightSegment = ContextRelationship(
-        description="Affected segment",
-        source_field="affected_segment_id",
+    operating_flight: OperatingFlight = ContextRelationship(
+        description="Operating flight affected by this disruption",
+        source_field="operating_flight_id",
     )
 
 
@@ -344,9 +393,9 @@ class ReaccommodationRecord(ContextModel):
         description="Timestamp when the reassignment was applied",
     )
 
-    protection_reason: str = ContextField(
+    reaccommodation_reason_code: str = ContextField(
         description="Why the reassignment was created",
-        index="text",
+        index="tag",
     )
 
     booking: Booking = ContextRelationship(
@@ -354,12 +403,12 @@ class ReaccommodationRecord(ContextModel):
         source_field="booking_id",
     )
 
-    original_segment: FlightSegment = ContextRelationship(
+    original_segment: ItinerarySegment = ContextRelationship(
         description="Original disrupted segment",
         source_field="original_segment_id",
     )
 
-    replacement_segment: FlightSegment = ContextRelationship(
+    replacement_segment: ItinerarySegment = ContextRelationship(
         description="Replacement segment assigned to the traveller",
         source_field="replacement_segment_id",
     )
