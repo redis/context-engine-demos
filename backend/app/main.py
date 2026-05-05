@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
 from typing import Any, AsyncIterator
@@ -18,13 +20,6 @@ from backend.app.contracts import ChatRequest
 from backend.app.internal_tools import InternalToolService, domain_runtime_config, internal_tool_names
 from backend.app.langgraph_agent import create_agent, create_checkpointer
 from backend.app.rag_service import SimpleRAGService
-from backend.app.radish_input_router import (
-    RadishRouterUnavailableError,
-    get_radish_router,
-    make_radish_bank_lifespan,
-    radish_blocked_sse,
-    radish_router_unavailable_sse,
-)
 from backend.app.sse import format_sse_event
 from backend.app.settings import get_settings
 
@@ -32,9 +27,21 @@ settings = get_settings()
 domain = get_active_domain(settings)
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
+# Avoid importing sentence-transformers / PyTorch unless this process serves Radish Bank.
+if settings.demo_domain == "radish-bank":
+    from backend.app.radish_input_router import make_radish_bank_lifespan
+
+    _lifespan = make_radish_bank_lifespan(settings)
+else:
+
+    @asynccontextmanager
+    async def _lifespan(_app: object):
+        yield
+
+
 app = FastAPI(
     title=f"{domain.manifest.branding.app_name} Demo",
-    lifespan=make_radish_bank_lifespan(settings),
+    lifespan=_lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
@@ -317,8 +324,16 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
     question = request.messages[-1].content if request.messages else ""
 
     if settings.demo_domain == "radish-bank":
+        from backend.app.radish_input_router import (
+            RadishRouterUnavailableError,
+            get_radish_router,
+            radish_blocked_sse,
+            radish_router_unavailable_sse,
+        )
+
+        router = get_radish_router(settings)
         try:
-            label, _ = get_radish_router(settings).classify(question)
+            label, _ = await asyncio.to_thread(router.classify, question)
         except RadishRouterUnavailableError:
             return StreamingResponse(
                 radish_router_unavailable_sse(),

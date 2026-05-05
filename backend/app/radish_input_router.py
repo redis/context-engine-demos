@@ -36,7 +36,6 @@ _MALICIOUS_PATTERNS = re.compile(
     r"\b(system|developer)\s*message\b|"
     r"\b(show|reveal|print|leak)\b.{0,20}\b(prompt|system\s*prompt|hidden)\b|"
     r"\bjailbreak\b|"
-    r"\bDAN\b|"
     r"<\s*/?\s*system\s*>|"
     r"\boverride\b.{0,20}\b(safety|guardrails)\b"
 )
