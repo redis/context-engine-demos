@@ -52,15 +52,78 @@ button { cursor: pointer; }
 .mode-btn { padding: 9px 16px; border: none; background: transparent; color: var(--muted); font-size: 0.82rem; font-weight: 700; letter-spacing: 0.02em; transition: 140ms ease; }
 .mode-btn:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--soft); }
 .mode-btn.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
-.demo-user-picker { display: grid; gap: 6px; }
-.demo-user-label { color: var(--muted); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.demo-user-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.demo-user-label {
+  color: color-mix(in srgb, var(--muted) 88%, var(--soft));
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+.demo-user-select-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 272px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 82%, var(--accent));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 94%, white), color-mix(in srgb, var(--panel) 96%, white)),
+    radial-gradient(circle at left center, color-mix(in srgb, var(--accent) 12%, transparent), transparent 52%);
+  box-shadow:
+    0 10px 24px rgba(16, 42, 67, 0.10),
+    inset 0 1px 0 color-mix(in srgb, white 56%, transparent);
+  overflow: hidden;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.demo-user-select-shell:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line-strong));
+  box-shadow:
+    0 14px 28px rgba(16, 42, 67, 0.14),
+    0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 62%, transparent);
+  transform: translateY(-1px);
+}
+.demo-user-select-accent {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white), color-mix(in srgb, var(--accent) 58%, white));
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--accent) 30%, transparent);
+}
 .demo-user-picker select {
-  min-width: 220px;
-  padding: 9px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--line-strong);
-  background: var(--panel-strong);
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  width: 100%;
+  padding: 12px 44px 12px 14px;
+  border: 0;
+  background: transparent;
   color: var(--text);
+  font-size: 0.94rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  outline: none;
+}
+.demo-user-select-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-52%);
+  color: color-mix(in srgb, var(--accent) 48%, var(--muted));
+  font-size: 1rem;
+  line-height: 1;
+  pointer-events: none;
+}
+.demo-user-picker select:hover { cursor: pointer; }
+.demo-user-picker select option {
+  color: #102a43;
+  background: #ffffff;
 }
 
 /* ── Workspace ───────────────────────────────────────── */
@@ -624,6 +687,12 @@ pre { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; background: #33
   .main { padding: 14px; }
   .topbar { flex-direction: column; align-items: flex-start; gap: 12px; }
   .topbar-controls { width: 100%; flex-direction: column; align-items: stretch; }
+  .demo-user-picker {
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .demo-user-select-shell { min-width: 0; width: 100%; }
   .demo-user-picker select { min-width: 0; width: 100%; }
   .hero-title { font-size: 2.2rem; }
   .composer textarea { min-height: 80px; }

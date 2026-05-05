@@ -135,7 +135,7 @@ const modeStorageKey = "demo-domain-mode";
 
 function toolKindLabel(kind: ToolEvent["toolKind"]) {
   if (kind === "mcp_tool") return "Context Surface";
-  if (kind === "cache") return "Semantic Cache (Gate)";
+  if (kind === "cache") return "Semantic Cache";
   return "Internal";
 }
 
@@ -924,19 +924,23 @@ export default function App() {
             {domain?.demo_users && domain.demo_users.length > 0 && (
               <label className="demo-user-picker">
                 <span className="demo-user-label">Passenger</span>
-                <select
-                  value={selectedDemoUserId}
-                  onChange={(event) => {
-                    setSelectedDemoUserId(event.target.value);
-                    resetConversation();
-                  }}
-                >
-                  {domain.demo_users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.subtitle ? `${user.label} • ${user.subtitle}` : user.label}
-                    </option>
-                  ))}
-                </select>
+                <span className="demo-user-select-shell">
+                  <span className="demo-user-select-accent" aria-hidden="true" />
+                  <select
+                    value={selectedDemoUserId}
+                    onChange={(event) => {
+                      setSelectedDemoUserId(event.target.value);
+                      resetConversation();
+                    }}
+                  >
+                    {domain.demo_users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.subtitle ? `${user.label} • ${user.subtitle}` : user.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="demo-user-select-arrow" aria-hidden="true">⌄</span>
+                </span>
               </label>
             )}
             <div className="mode-toggle">
