@@ -67,6 +67,35 @@ class FakeRedis:
         raise AssertionError(f"Unexpected Redis command: {args}")
 
 
+class FakeStreamRedis:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def xrevrange(self, key: str, max: str, min: str, count: int):
+        assert key == "finance-researcher:stream:events"
+        assert max == "+"
+        assert min == "-"
+        assert count == 3
+        return [
+            (
+                "1710000000000-0",
+                {
+                    "event_family": "coverage",
+                    "event_type": "guidance-update",
+                    "headline": "NVIDIA updated investor messaging around growth priorities",
+                    "ticker": "NVDA",
+                    "company_id": "company:nvda",
+                    "document_id": "research-doc:nvda-guidance-update",
+                    "importance_score": "0.91",
+                    "payload": '{"sentiment":"constructive","themes":["growth","margin"]}',
+                },
+            )
+        ]
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def test_finance_researcher_writes_and_queries_redis_timeseries(monkeypatch) -> None:
     fake_redis = FakeRedis()
     domain_module = importlib.import_module("domains.finance-researcher.domain")
@@ -141,3 +170,24 @@ def test_finance_researcher_writes_and_queries_redis_timeseries(monkeypatch) -> 
     assert result["chart"]["type"] == "timeseries"
     assert result["chart"]["series"][0]["label"] == "NVDA close"
     assert len(result["chart"]["series"][0]["points"]) == 2
+
+
+def test_finance_researcher_reads_recent_watchlist_events(monkeypatch) -> None:
+    fake_redis = FakeStreamRedis()
+    domain_module = importlib.import_module("domains.finance-researcher.domain")
+    monkeypatch.setattr(domain_module, "create_redis_client", lambda settings: fake_redis)
+
+    domain = load_domain("finance-researcher")
+    result = domain.execute_internal_tool("recent_watchlist_events", {"limit": 3}, object())
+
+    assert result["stream_key"] == "finance-researcher:stream:events"
+    assert result["redis_command"] == "XREVRANGE finance-researcher:stream:events + - COUNT 3"
+    assert result["event_count"] == 1
+    assert result["events"][0]["ticker"] == "NVDA"
+    assert result["events"][0]["company_id"] == "company_nvda"
+    assert result["events"][0]["legacy_company_id"] == "company:nvda"
+    assert result["events"][0]["document_id"] == ""
+    assert result["events"][0]["legacy_document_id"] == "research-doc:nvda-guidance-update"
+    assert result["events"][0]["importance_score"] == 0.91
+    assert result["events"][0]["payload"]["sentiment"] == "constructive"
+    assert fake_redis.closed is True

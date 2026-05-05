@@ -269,6 +269,12 @@ def slugify(text: str) -> str:
     return text.strip("-") or "item"
 
 
+def tag_safe_slug(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9]+", "_", text)
+    return text.strip("_") or "item"
+
+
 def safe_filename(name: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", name.strip())
     return cleaned.strip("._") or "file"
@@ -756,7 +762,9 @@ def normalize_event_type(source_type: str) -> str:
 
 
 def make_document_id(*, ticker: str, source_type: str, accession: str, filename: str) -> str:
-    return f"{ticker}_{source_type}_{accession.replace('-', '')}_{slugify(Path(filename).stem)}"
+    accession_slug = tag_safe_slug(accession)
+    filename_slug = tag_safe_slug(Path(filename).stem)
+    return f"{ticker}_{source_type}_{accession_slug}_{filename_slug}"
 
 
 def make_chunk_id(document_id: str, index: int) -> str:

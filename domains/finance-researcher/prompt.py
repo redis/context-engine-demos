@@ -13,6 +13,7 @@ def build_system_prompt(*, mcp_tools: Sequence[dict[str, Any]], runtime_config: 
         ("get_current_time", "anchor recentness, filing dates, and market comparisons"),
         ("dataset_overview", "check whether the current dataset has enough companies, documents, and prices"),
         ("watchlist_overview", "inspect the analyst watchlist and current coverage state"),
+        ("recent_watchlist_events", "read live Redis Stream updates shown in the UI feed"),
         ("query_finance_timeseries", "query RedisTimeSeries for price or fundamentals trends and inspect the exact TS.RANGE command"),
         ("vector_search_research_chunks", "search narrative evidence from filings, releases, and presentations"),
         ("filter_company_by_ticker", "jump straight to the company record"),
@@ -43,6 +44,8 @@ Internal tools (instant, local):
     Call this whenever you need to compare against filing dates, earnings dates, or market dates.
   • dataset_overview — returns the current dataset coverage summary.
   • watchlist_overview — returns the active 14-company watchlist and current coverage state.
+  • recent_watchlist_events — reads the latest Redis Stream updates that power the live UI feed.
+    Use this FIRST when the user asks what just changed, mentions a live update, or asks "what's new".
   • query_finance_timeseries — queries RedisTimeSeries for watchlist price or fundamentals trends.
     Use this FIRST for trend, price-action, or metric-series questions when the answer depends on time-series data.
 
@@ -57,11 +60,15 @@ Context Surface tools (query Redis via MCP):
 2. DISTINGUISH SOURCES. Structured metrics answer "how much" and "when". Narrative documents answer "why" and "what
    management said". Do not blur the two.
 
-3. USE PRECISE REFERENCES. Name the company, ticker, document family, and period whenever possible.
+3. TREAT LIVE EVENTS AS STREAM CONTEXT. If the user asks what changed after a live update appears, call
+   recent_watchlist_events. Do not rely only on static CoverageEvent records.
 
-4. BE EXPLICIT ABOUT MISSING DATA. If a company, period, or metric is absent, say so plainly instead of inferring.
+4. USE PRECISE REFERENCES. Name the company, ticker, document family, and period whenever possible.
 
-5. DO NOT IMPLY UNAVAILABLE SOURCES. Treat broker research, paywalled transcripts, and non-official commentary as out
+5. BE EXPLICIT ABOUT MISSING DATA. If a company, period, metric, or source document is absent, say so plainly instead
+   of inferring.
+
+6. DO NOT IMPLY UNAVAILABLE SOURCES. Treat broker research, paywalled transcripts, and non-official commentary as out
    of scope unless they are clearly present in the provided data.
 
 ═══ FLAGSHIP WORKFLOWS ═══
@@ -89,9 +96,10 @@ Price and fundamentals trend comparison:
 
 What's new in my watchlist:
   1. get_current_user_profile
-  2. watchlist_overview
-  3. filter_coverageevent_by_company_id
-  4. filter_researchdocument_by_company_id when the event points to a new filing or release
+  2. recent_watchlist_events
+  3. watchlist_overview
+  4. filter_company_by_ticker or filter_coverageevent_by_company_id for the affected ticker/company
+  5. filter_researchdocument_by_company_id only when a stream event or coverage record includes a valid document_id
 
 Watchlist scope:
   • Keep company comparisons inside the 14-name watchlist: NVDA, AMD, AVGO, MU, INTC, QCOM, AAPL, AMZN,
