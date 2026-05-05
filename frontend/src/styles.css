@@ -40,6 +40,7 @@ button { cursor: pointer; }
 /* ── Topbar: brand left, mode toggle right ───────────── */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
 .topbar-left { display: flex; align-items: center; gap: 14px; }
+.topbar-controls { display: flex; align-items: center; gap: 14px; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-logo { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; overflow: hidden; }
 .brand-logo img, .hero-logo img { width: 100%; height: 100%; object-fit: contain; }
@@ -51,6 +52,16 @@ button { cursor: pointer; }
 .mode-btn { padding: 9px 16px; border: none; background: transparent; color: var(--muted); font-size: 0.82rem; font-weight: 700; letter-spacing: 0.02em; transition: 140ms ease; }
 .mode-btn:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--soft); }
 .mode-btn.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.demo-user-picker { display: grid; gap: 6px; }
+.demo-user-label { color: var(--muted); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.demo-user-picker select {
+  min-width: 220px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-strong);
+  color: var(--text);
+}
 
 /* ── Workspace ───────────────────────────────────────── */
 .workspace { min-height: 0; }
@@ -413,6 +424,7 @@ button { cursor: pointer; }
 .tool-source { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .tool-source.internal_function { background: color-mix(in srgb, #ffcc80 22%, white); color: #8a4b00; }
 .tool-source.mcp_tool { background: color-mix(in srgb, #ff8a80 20%, white); color: #8d2f2f; }
+.tool-source.cache { background: color-mix(in srgb, #8ad7ff 20%, white); color: #16527d; }
 .tool-name { font-weight: 800; letter-spacing: -0.01em; }
 .tool-status {
   display: inline-flex;
@@ -608,4 +620,11 @@ pre { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; background: #33
 .quick-start-chip:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--accent) 10%, white); color: var(--text); }
 
 /* ── Responsive ──────────────────────────────────────── */
-@media (max-width: 820px) { .main { padding: 14px; } .topbar { flex-direction: column; align-items: flex-start; gap: 12px; } .hero-title { font-size: 2.2rem; } .composer textarea { min-height: 80px; } }
+@media (max-width: 820px) {
+  .main { padding: 14px; }
+  .topbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .topbar-controls { width: 100%; flex-direction: column; align-items: stretch; }
+  .demo-user-picker select { min-width: 0; width: 100%; }
+  .hero-title { font-size: 2.2rem; }
+  .composer textarea { min-height: 80px; }
+}

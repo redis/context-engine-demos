@@ -7,7 +7,7 @@ type ChatRole = "user" | "assistant";
 type ToolEvent = {
   runId: string;
   toolName: string;
-  toolKind: "internal_function" | "mcp_tool";
+  toolKind: "internal_function" | "mcp_tool" | "cache";
   status: "call" | "result";
   payload: Record<string, unknown>;
   durationMs?: number;
@@ -56,6 +56,7 @@ type HealthState = {
 type AgentMode = "context_surfaces" | "simple_rag";
 
 type PromptCard = { eyebrow: string; title: string; prompt: string };
+type DemoUserOption = { id: string; label: string; subtitle?: string | null; cache_group_id?: string | null };
 
 type DomainConfig = {
   id: string;
@@ -75,6 +76,9 @@ type DomainConfig = {
     live_updates_title?: string;
   };
   logo_src: string;
+  semantic_cache_enabled?: boolean;
+  demo_users?: DemoUserOption[];
+  default_demo_user_id?: string | null;
 } | null;
 
 function isLightColor(value?: string) {
@@ -130,7 +134,9 @@ type TimeSeriesChartPayload = {
 const modeStorageKey = "demo-domain-mode";
 
 function toolKindLabel(kind: ToolEvent["toolKind"]) {
-  return kind === "mcp_tool" ? "Context Surface" : "Internal";
+  if (kind === "mcp_tool") return "Context Surface";
+  if (kind === "cache") return "Semantic Cache (Gate)";
+  return "Internal";
 }
 
 function formatTotalElapsedMs(ms: number) {
@@ -687,6 +693,7 @@ export default function App() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState(() => crypto.randomUUID());
+  const [selectedDemoUserId, setSelectedDemoUserId] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const liveFeedHydratedRef = useRef(false);
   const liveFeedTickerTimeoutRef = useRef<number | null>(null);
@@ -702,7 +709,10 @@ export default function App() {
   useEffect(() => {
     void fetch("/api/domain-config")
       .then((r) => r.json())
-      .then((p: DomainConfig) => setDomain(p))
+      .then((p: DomainConfig) => {
+        setDomain(p);
+        setSelectedDemoUserId(p?.default_demo_user_id ?? p?.demo_users?.[0]?.id ?? "");
+      })
       .catch(() => setDomain(null));
   }, []);
 
@@ -787,6 +797,11 @@ export default function App() {
     document.title = domain?.app_name ?? "Domain Demo";
   }, [domain]);
 
+  function resetConversation() {
+    setMessages([]);
+    setThreadId(crypto.randomUUID());
+  }
+
   async function submitPrompt(prompt: string, event?: FormEvent) {
     event?.preventDefault();
     const trimmed = prompt.trim();
@@ -809,6 +824,7 @@ export default function App() {
           messages: nextMessages.map(({ role, content }) => ({ role, content })),
           mode,
           thread_id: threadId,
+          demo_user_id: selectedDemoUserId || null,
         }),
       });
 
@@ -904,9 +920,29 @@ export default function App() {
               </div>
             </div>
           </div>
-          <div className="mode-toggle">
-            <button className={`mode-btn ${mode === "context_surfaces" ? "active" : ""}`} onClick={() => { setMode("context_surfaces"); setMessages([]); setThreadId(crypto.randomUUID()); }} type="button">Context Surfaces</button>
-            <button className={`mode-btn ${mode === "simple_rag" ? "active" : ""}`} onClick={() => { setMode("simple_rag"); setMessages([]); setThreadId(crypto.randomUUID()); }} type="button">Simple RAG</button>
+          <div className="topbar-controls">
+            {domain?.demo_users && domain.demo_users.length > 0 && (
+              <label className="demo-user-picker">
+                <span className="demo-user-label">Passenger</span>
+                <select
+                  value={selectedDemoUserId}
+                  onChange={(event) => {
+                    setSelectedDemoUserId(event.target.value);
+                    resetConversation();
+                  }}
+                >
+                  {domain.demo_users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.subtitle ? `${user.label} • ${user.subtitle}` : user.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="mode-toggle">
+              <button className={`mode-btn ${mode === "context_surfaces" ? "active" : ""}`} onClick={() => { setMode("context_surfaces"); resetConversation(); }} type="button">Context Surfaces</button>
+              <button className={`mode-btn ${mode === "simple_rag" ? "active" : ""}`} onClick={() => { setMode("simple_rag"); resetConversation(); }} type="button">Simple RAG</button>
+            </div>
           </div>
         </header>
 
