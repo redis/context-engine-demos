@@ -65,6 +65,30 @@ domains/<domain-id>/presentations/
   - `generate_demo_data`
   - `validate`
 
+## Internal Tools
+
+Every domain **must** register at least these internal tools in `get_internal_tool_definitions`:
+
+1. **`get_current_user_profile`** — returns the signed-in user's identity (ID, name, email). Uses `manifest.identity` for env var names, defaults, and `id_field`. Set `identity.id_field` to the domain-appropriate field name (e.g. `"patient_id"`, `"customer_id"`).
+2. **`get_current_time`** — returns the current UTC timestamp in ISO 8601. The agent needs this to compare against dates in the data.
+3. **`dataset_overview`** — returns record counts per entity. Useful for the agent to understand the data scope.
+
+`execute_internal_tool` must handle all three tool names and return dicts.
+
+## Prompt Rules
+
+The system prompt built by `prompt.py` must include:
+
+- A hint that all `filter_*` and `search_*` MCP tools take a single **`value`** parameter (a string). Without this, the LLM may pass the field name as the parameter key (e.g. `patient_id="P001"` instead of `value="P001"`), which the MCP server rejects silently.
+- Tool discovery hints mapping tool names to descriptions for the tools present in `mcp_tools`.
+- Common workflows showing the sequence of tool calls for each demo scenario.
+- A rule to call `get_current_user_profile` first for any user-specific question.
+
+## Data Generation Rules
+
+- `generate_demo_data` defaults to `update_env_file=False`. Only the `scripts/generate_data.py` pipeline and direct `main()` invocation should pass `update_env_file=True`.
+- If the domain has a `main()` guard at the bottom of `data_generator.py`, it must pass `update_env_file=True` explicitly.
+
 ## Quality Bar
 
 - Seed the domain with at least one flagship demo user and enough data to support 2-3 realistic conversation paths.
@@ -89,6 +113,10 @@ Do not consider the task complete if any of these remain:
 - missing logo asset
 - `validate_domain.py` fails
 - `smoke_domain.py` fails
+- `get_internal_tool_definitions` returns an empty tuple
+- system prompt is missing the `value` parameter hint for MCP tools
+- `generate_demo_data` still defaults `update_env_file=True`
+- generated models use `Any` as relationship type annotations (run `make generate-models DOMAIN=<id>` to regenerate)
 
 ## References
 

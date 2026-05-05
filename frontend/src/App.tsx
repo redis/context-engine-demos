@@ -45,6 +45,8 @@ type ChatMessage = {
   totalElapsedMs?: number;
   /** Server ended chat (e.g. security); keep thread read-only until user clears or switches mode. */
   sessionTerminated?: boolean;
+  /** SSE ``error`` event (e.g. LiteLLM ``budget_exceeded``). */
+  streamError?: { code: string; message: string };
 };
 
 type HealthState = {
@@ -857,6 +859,11 @@ export default function App() {
                   return { ...m, content: m.content + (ev.delta ?? "") };
                 case "session-terminated":
                   return { ...m, sessionTerminated: true };
+                case "error": {
+                  const code = typeof ev.errorCode === "string" ? ev.errorCode : "openai_error";
+                  const message = typeof ev.message === "string" ? ev.message : "Request failed.";
+                  return { ...m, streamError: { code, message } };
+                }
                 case "done":
                   return { ...m, totalElapsedMs: ev.totalElapsedMs };
                 default:
@@ -920,6 +927,14 @@ export default function App() {
               const showStatus = isAssistant && !message.content && lastStatus;
               return (
                 <article key={message.id} className={`message-block ${message.role}`}>
+                  {isAssistant && message.streamError && (
+                    <div
+                      className={`stream-error-banner ${message.streamError.code === "budget_exceeded" ? "is-budget" : ""}`}
+                      role="alert"
+                    >
+                      {message.streamError.message}
+                    </div>
+                  )}
                   {showStatus && (
                     <div className="status-line">⏳ {lastStatus.text}</div>
                   )}

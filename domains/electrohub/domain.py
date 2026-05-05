@@ -293,7 +293,11 @@ class ElectrohubDomain:
                 "confidence": "low",
             }
 
-        client = OpenAI(api_key=settings.openai_api_key)
+        client_kw: dict[str, Any] = {"api_key": settings.openai_api_key}
+        base_url = getattr(settings, "openai_base_url", None)
+        if base_url:
+            client_kw["base_url"] = base_url
+        client = OpenAI(**client_kw)
         response = client.chat.completions.create(
             model=settings.openai_lightweight_model or settings.openai_chat_model,
             response_format={"type": "json_object"},
@@ -361,7 +365,7 @@ class ElectrohubDomain:
         *,
         output_dir: Path,
         seed: int | None = None,
-        update_env_file: bool = True,
+        update_env_file: bool = False,
     ) -> GeneratedDataset:
         return generate_demo_data(output_dir=output_dir, seed=seed, update_env_file=update_env_file)
 

@@ -99,10 +99,10 @@ flush-redis:
 
 reset: flush-redis
 	@echo "Clearing old surface credentials..."
-	@sed -i '' 's/^CTX_SURFACE_ID=.*/CTX_SURFACE_ID=/' .env
-	@sed -i '' 's/^MCP_AGENT_KEY=.*/MCP_AGENT_KEY=/' .env
-	@$(MAKE) setup-surface DOMAIN=$(DOMAIN)
-	@$(MAKE) load-data DOMAIN=$(DOMAIN)
+	@perl -i -pe 's/^CTX_SURFACE_ID=.*/CTX_SURFACE_ID=/' .env
+	@perl -i -pe 's/^MCP_AGENT_KEY=.*/MCP_AGENT_KEY=/' .env
+	@$(MAKE) setup-surface
+	@$(MAKE) load-data
 	@echo ""
 	@echo "✅ Reset complete. Run 'make dev' to start."
 

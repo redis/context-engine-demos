@@ -59,7 +59,7 @@ from pathlib import Path
 from backend.app.core.domain_contract import GeneratedDataset
 
 
-def generate_demo_data(*, output_dir: Path, seed: int | None = None, update_env_file: bool = True) -> GeneratedDataset:
+def generate_demo_data(*, output_dir: Path, seed: int | None = None, update_env_file: bool = False) -> GeneratedDataset:
     del seed, update_env_file
     output_dir.mkdir(parents=True, exist_ok=True)
     return GeneratedDataset(output_dir=str(output_dir), env_updates={{}}, summary={{}})
@@ -192,7 +192,7 @@ class {title.replace(" ", "")}Domain:
         *,
         output_dir: Path,
         seed: int | None = None,
-        update_env_file: bool = True,
+        update_env_file: bool = False,
     ) -> GeneratedDataset:
         return generate_demo_data(output_dir=output_dir, seed=seed, update_env_file=update_env_file)
 

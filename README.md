@@ -67,13 +67,14 @@ Edit `.env` and fill in three values:
 
 ```env
 OPENAI_API_KEY=your-openai-api-key
+# Optional: OPENAI_BASE_URL=http://litellm:4000/v1 — OpenAI-compatible proxy; omit for api.openai.com.
 REDIS_HOST=redis-xxxxx.c1.us-east-1-2.ec2.redns.redis-cloud.com
 REDIS_PORT=12345
 REDIS_PASSWORD=your-redis-password
 CTX_ADMIN_KEY=your-admin-key
 ```
 
-Everything else is auto-populated by later steps or has sensible defaults. The active domain defaults to `reddash`; you can override it with `DEMO_DOMAIN=<domain-id>` or `make ... DOMAIN=<domain-id>`.
+Everything else is auto-populated by later steps or has sensible defaults. `OPENAI_BASE_URL` is optional; when unset, the app uses the default OpenAI API host. The active domain defaults to `reddash`; you can override it with `DEMO_DOMAIN=<domain-id>` or `make ... DOMAIN=<domain-id>`.
 
 ### 2. Install dependencies
 

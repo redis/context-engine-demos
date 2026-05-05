@@ -127,17 +127,21 @@ def _serialize_verifier_context(messages: list[Any]) -> str:
 def _build_post_model_hook(
     model: ChatOpenAI,
     *,
+    settings: Settings,
     domain: Any,
     lightweight_model_name: str,
     runtime_config: dict[str, Any],
 ) -> Callable[[dict], Any]:
-    verifier_model = ChatOpenAI(
-        model=lightweight_model_name
+    verifier_kw: dict[str, Any] = {
+        "model": lightweight_model_name
         or getattr(model, "model_name", None)
         or getattr(model, "model", None),
-        temperature=0.2,
-        api_key=getattr(model, "openai_api_key", None) or getattr(model, "api_key", None),
-    )
+        "temperature": 0.2,
+        "api_key": getattr(model, "openai_api_key", None) or getattr(model, "api_key", None),
+    }
+    if settings.openai_base_url:
+        verifier_kw["base_url"] = settings.openai_base_url
+    verifier_model = ChatOpenAI(**verifier_kw)
     domain_guidance = ""
     if hasattr(domain, "build_answer_verifier_prompt"):
         domain_guidance = str(domain.build_answer_verifier_prompt(runtime_config=runtime_config) or "").strip()
@@ -379,11 +383,14 @@ async def create_agent(
     """Create a LangGraph ReAct agent with all available tools and Redis checkpointer."""
     domain = get_active_domain(settings)
     runtime_config = domain_runtime_config(domain, settings)
-    model = ChatOpenAI(
-        model=settings.openai_chat_model,
-        temperature=0.2,
-        api_key=settings.openai_api_key,
-    )
+    model_kw: dict[str, Any] = {
+        "model": settings.openai_chat_model,
+        "temperature": 0.2,
+        "api_key": settings.openai_api_key,
+    }
+    if settings.openai_base_url:
+        model_kw["base_url"] = settings.openai_base_url
+    model = ChatOpenAI(**model_kw)
 
     tools = _make_internal_tools(internal_tools)
     mcp_defs = await cs_service.list_tools()
@@ -394,6 +401,7 @@ async def create_agent(
     if runtime_config.get("enable_post_model_verifier", False):
         post_model_hook = _build_post_model_hook(
             model,
+            settings=settings,
             domain=domain,
             lightweight_model_name=settings.openai_lightweight_model or settings.openai_chat_model,
             runtime_config=runtime_config,

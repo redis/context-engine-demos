@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     )
 
     openai_api_key: str = Field(default="")
+    openai_base_url: str | None = Field(default=None)
     openai_chat_model: str = Field(default="gpt-4o")
     openai_embedding_model: str = Field(default="text-embedding-3-small")
     openai_reasoning_effort: str = Field(default="medium")

@@ -214,7 +214,7 @@ class ReddashDomain:
         *,
         output_dir: Path,
         seed: int | None = None,
-        update_env_file: bool = True,
+        update_env_file: bool = False,
     ) -> GeneratedDataset:
         return generate_demo_data(output_dir=output_dir, seed=seed, update_env_file=update_env_file)
 
