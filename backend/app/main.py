@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from time import perf_counter
 from typing import Any, AsyncIterator
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,11 +14,14 @@ from langchain_core.messages import AIMessage
 
 from backend.app.domain_events import stream_domain_events
 from backend.app.context_surface_service import ContextSurfaceService
+from backend.app.core.domain_contract import InternalToolAccessControl
 from backend.app.core.domain_loader import get_active_domain
 from backend.app.contracts import ChatRequest
 from backend.app.internal_tools import InternalToolService, domain_runtime_config, internal_tool_names
 from backend.app.langgraph_agent import create_agent, create_checkpointer
+from backend.app.request_context import request_context_scope
 from backend.app.rag_service import SimpleRAGService
+from backend.app.semantic_cache import LookupClass, SemanticCacheService
 from backend.app.sse import format_sse_event
 from backend.app.settings import get_settings
 
@@ -37,6 +41,7 @@ internal_tools = InternalToolService(settings)
 cs_service = ContextSurfaceService(settings)
 rag_service = SimpleRAGService(settings, cs_service)
 runtime_config = domain_runtime_config(domain, settings)
+semantic_cache_service = SemanticCacheService(settings, domain)
 
 _langgraph_agent = None
 _checkpointer = None
@@ -79,6 +84,7 @@ def _logo_src(path: Path) -> str:
 
 
 _INTERNAL_NAMES: set[str] | None = None
+_INTERNAL_TOOL_ACCESS: dict[str, InternalToolAccessControl] | None = None
 
 
 def _tool_kind(name: str) -> str:
@@ -86,6 +92,16 @@ def _tool_kind(name: str) -> str:
     if _INTERNAL_NAMES is None:
         _INTERNAL_NAMES = {t.name for t in internal_tools.definitions}
     return "internal_function" if name in _INTERNAL_NAMES else "mcp_tool"
+
+
+def _internal_tool_access_control(name: str) -> InternalToolAccessControl:
+    global _INTERNAL_TOOL_ACCESS
+    if _INTERNAL_TOOL_ACCESS is None:
+        _INTERNAL_TOOL_ACCESS = {
+            tool.name: tool.access_control
+            for tool in internal_tools.definitions
+        }
+    return _INTERNAL_TOOL_ACCESS.get(name, InternalToolAccessControl())
 
 
 def _short_input(payload: Any) -> str:
@@ -133,6 +149,21 @@ def _llm_phase_label(*, llm_call_index: int, tool_calls_seen: int) -> str:
     return "Reason about the request and decide the next step."
 
 
+def _domain_demo_users() -> list[dict[str, Any]]:
+    getter = getattr(domain, "get_demo_users", None)
+    if not callable(getter):
+        return []
+    return [user.model_dump() if hasattr(user, "model_dump") else dict(user) for user in getter()]
+
+
+def _resolve_demo_user(request: ChatRequest) -> dict[str, Any] | None:
+    resolver = getattr(domain, "resolve_demo_user", None)
+    if not callable(resolver):
+        return None
+    selected_id = request.demo_user_id or domain.manifest.identity.default_id
+    return resolver(selected_id)
+
+
 @app.get("/api/health")
 async def health() -> JSONResponse:
     mcp_tool_names = [tool.get("name", "") for tool in await cs_service.list_tools()]
@@ -148,6 +179,7 @@ async def health() -> JSONResponse:
 @app.get("/api/domain-config")
 async def domain_config() -> JSONResponse:
     branding = domain.manifest.branding
+    demo_users = _domain_demo_users()
     return JSONResponse({
         "id": domain.manifest.id,
         "app_name": branding.app_name,
@@ -158,6 +190,9 @@ async def domain_config() -> JSONResponse:
         "theme": branding.theme.model_dump(),
         "ui": branding.ui.model_dump(),
         "logo_src": _logo_src(ROOT_DIR / branding.logo_path),
+        "semantic_cache_enabled": bool(semantic_cache_service.enabled),
+        "demo_users": demo_users,
+        "default_demo_user_id": demo_users[0]["id"] if demo_users else None,
     })
 
 
@@ -170,128 +205,266 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
 
     thread_id = request.thread_id or "default"
     latest_message = request.messages[-1].content if request.messages else ""
+    demo_user = _resolve_demo_user(request)
+    cache_group_id = ""
 
     config = {"configurable": {"thread_id": thread_id}}
+    if demo_user:
+        cache_group_id = str(demo_user.get("cache_group_id") or "")
 
-    tool_start_times: dict[str, float] = {}
-    llm_start_times: dict[str, float] = {}
-    llm_step_ids: dict[str, str] = {}
-    llm_call_counter = 0
-    tool_calls_seen = 0
-    last_thinking_step: str | None = None
+    with request_context_scope(demo_user_id=request.demo_user_id, demo_user=demo_user):
+        cache_write_flags = {"public": False, "group": False, "non_cacheable": False}
+        cache_lookup_eligible = False
+        cache_lookup_class: LookupClass = "skip"
+        streamed_text: list[str] = []
 
-    async for event in agent.astream_events(
-        {"messages": [{"role": "user", "content": latest_message}]},
-        config=config,
-        version="v2",
-    ):
-        kind = event["event"]
-
-        if kind == "on_tool_start":
-            name = event.get("name", "")
-            tool_input = event["data"].get("input", {})
-            tool_start_times[event["run_id"]] = perf_counter()
-            tool_calls_seen += 1
-            thinking_step = _thinking_step_for_tool(name, tool_input)
-            if thinking_step and thinking_step != last_thinking_step:
-                last_thinking_step = thinking_step
-                yield format_sse_event("thinking-step", step=thinking_step, ts=timer.elapsed_ms())
+        if semantic_cache_service.enabled:
+            cache_lookup_eligible = len(request.messages) == 1 and await semantic_cache_service.thread_is_fresh(agent, config)
+            cache_lookup_class = semantic_cache_service.classify_lookup(latest_message, demo_user)
+            cache_payload = {
+                "question": latest_message,
+                "eligible": cache_lookup_eligible,
+                "lookupClass": cache_lookup_class,
+                "groupId": cache_group_id or None,
+            }
+            cache_run_id = f"cache-gate-{uuid4()}"
+            cache_started = perf_counter()
             yield format_sse_event(
                 "tool-call",
-                toolName=name,
-                toolKind=_tool_kind(name),
-                runId=event["run_id"],
-                payload=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
+                toolName="semantic_cache_gate",
+                toolKind="cache",
+                runId=cache_run_id,
+                payload=cache_payload,
                 ts=timer.elapsed_ms(),
             )
+            bypass_reason = ""
+            cache_hit = None
+            if not cache_lookup_eligible:
+                bypass_reason = "single-turn cache requires a fresh thread"
+            elif cache_lookup_class == "skip":
+                bypass_reason = "request class is not cacheable"
+            else:
+                cache_hit = await semantic_cache_service.check(
+                    prompt=latest_message,
+                    lookup_class=cache_lookup_class,
+                    group_id=cache_group_id or None,
+                )
 
-        elif kind == "on_tool_end":
-            name = event.get("name", "")
-            raw_output = event["data"].get("output", "")
-            try:
-                output = json.loads(str(raw_output)) if raw_output else {}
-            except (json.JSONDecodeError, TypeError):
-                output = {"result": str(raw_output)}
-            start = tool_start_times.pop(event["run_id"], perf_counter())
-            duration_ms = max(round((perf_counter() - start) * 1000), 1)
+            cache_duration_ms = max(round((perf_counter() - cache_started) * 1000), 1)
+            if cache_hit is not None:
+                persisted = await semantic_cache_service.persist_cached_turn(
+                    agent=agent,
+                    config=config,
+                    question=latest_message,
+                    answer=cache_hit.response,
+                )
+                if persisted:
+                    yield format_sse_event(
+                        "tool-result",
+                        toolName="semantic_cache_gate",
+                        toolKind="cache",
+                        runId=cache_run_id,
+                        payload={
+                            "result": "hit",
+                            "accessClass": cache_hit.filters.get("access_class") or cache_lookup_class,
+                            "groupId": cache_hit.filters.get("group_id") or None,
+                        },
+                        durationMs=cache_duration_ms,
+                        ts=timer.elapsed_ms(),
+                    )
+                    yield format_sse_event("status", text="Semantic cache hit. Reusing a matching standalone answer.", ts=timer.elapsed_ms())
+                    yield format_sse_event("text-delta", delta=cache_hit.response)
+                    yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
+                    return
+                bypass_reason = "cached turn could not be persisted into thread state"
+
+            if bypass_reason:
+                cache_result_payload: dict[str, Any] = {
+                    "result": "bypass",
+                    "reason": bypass_reason,
+                    "accessClass": cache_lookup_class,
+                }
+            else:
+                cache_result_payload = {
+                    "result": "miss",
+                    "accessClass": cache_lookup_class,
+                }
             yield format_sse_event(
                 "tool-result",
-                toolName=name,
-                toolKind=_tool_kind(name),
-                runId=event["run_id"],
-                payload=output,
-                durationMs=duration_ms,
+                toolName="semantic_cache_gate",
+                toolKind="cache",
+                runId=cache_run_id,
+                payload=cache_result_payload,
+                durationMs=cache_duration_ms,
                 ts=timer.elapsed_ms(),
             )
 
-        elif kind == "on_chat_model_start":
-            if not settings.show_llm_trace_steps:
-                continue
-            llm_call_counter += 1
-            llm_start_times[event["run_id"]] = perf_counter()
-            step_id = f"llm-step-{llm_call_counter}"
-            llm_step_ids[event["run_id"]] = step_id
-            step = _llm_phase_label(llm_call_index=llm_call_counter, tool_calls_seen=tool_calls_seen)
-            last_thinking_step = step
+        tool_start_times: dict[str, float] = {}
+        llm_start_times: dict[str, float] = {}
+        llm_step_ids: dict[str, str] = {}
+        llm_call_counter = 0
+        tool_calls_seen = 0
+        last_thinking_step: str | None = None
+
+        async for event in agent.astream_events(
+            {"messages": [{"role": "user", "content": latest_message}]},
+            config=config,
+            version="v2",
+        ):
+            kind = event["event"]
+
+            if kind == "on_tool_start":
+                name = event.get("name", "")
+                tool_input = event["data"].get("input", {})
+                tool_start_times[event["run_id"]] = perf_counter()
+                tool_calls_seen += 1
+
+                if _tool_kind(name) == "internal_function":
+                    access = _internal_tool_access_control(name)
+                    if access.access_control_enabled:
+                        if access.access_class_override == "public":
+                            cache_write_flags["public"] = True
+                        elif access.access_class_override == "group":
+                            cache_write_flags["group"] = True
+                        elif access.access_class_override == "non-cacheable":
+                            cache_write_flags["non_cacheable"] = True
+                else:
+                    access_class = semantic_cache_service.classify_mcp_tool(name)
+                    if access_class == "public":
+                        cache_write_flags["public"] = True
+                    elif access_class == "group":
+                        cache_write_flags["group"] = True
+                    elif access_class == "non-cacheable":
+                        cache_write_flags["non_cacheable"] = True
+
+                thinking_step = _thinking_step_for_tool(name, tool_input)
+                if thinking_step and thinking_step != last_thinking_step:
+                    last_thinking_step = thinking_step
+                    yield format_sse_event("thinking-step", step=thinking_step, ts=timer.elapsed_ms())
+                yield format_sse_event(
+                    "tool-call",
+                    toolName=name,
+                    toolKind=_tool_kind(name),
+                    runId=event["run_id"],
+                    payload=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
+                    ts=timer.elapsed_ms(),
+                )
+
+            elif kind == "on_tool_end":
+                name = event.get("name", "")
+                raw_output = event["data"].get("output", "")
+                try:
+                    output = json.loads(str(raw_output)) if raw_output else {}
+                except (json.JSONDecodeError, TypeError):
+                    output = {"result": str(raw_output)}
+                start = tool_start_times.pop(event["run_id"], perf_counter())
+                duration_ms = max(round((perf_counter() - start) * 1000), 1)
+                yield format_sse_event(
+                    "tool-result",
+                    toolName=name,
+                    toolKind=_tool_kind(name),
+                    runId=event["run_id"],
+                    payload=output,
+                    durationMs=duration_ms,
+                    ts=timer.elapsed_ms(),
+                )
+
+            elif kind == "on_chat_model_start":
+                if not settings.show_llm_trace_steps:
+                    continue
+                llm_call_counter += 1
+                llm_start_times[event["run_id"]] = perf_counter()
+                step_id = f"llm-step-{llm_call_counter}"
+                llm_step_ids[event["run_id"]] = step_id
+                step = _llm_phase_label(llm_call_index=llm_call_counter, tool_calls_seen=tool_calls_seen)
+                last_thinking_step = step
+                yield format_sse_event(
+                    "thinking-step",
+                    step=step,
+                    stepId=step_id,
+                    stepKind="llm",
+                    ts=timer.elapsed_ms(),
+                )
+
+            elif kind == "on_chat_model_end":
+                if not settings.show_llm_trace_steps:
+                    continue
+                start = llm_start_times.pop(event["run_id"], perf_counter())
+                step_id = llm_step_ids.pop(event["run_id"], "")
+                duration_ms = max(round((perf_counter() - start) * 1000), 1)
+                if step_id:
+                    yield format_sse_event(
+                        "thinking-step-finish",
+                        stepId=step_id,
+                        durationMs=duration_ms,
+                        durationText=_format_elapsed_ms(duration_ms),
+                        ts=timer.elapsed_ms(),
+                    )
+                else:
+                    yield format_sse_event(
+                        "status",
+                        text=f"LLM step completed in {_format_elapsed_ms(duration_ms)}",
+                        ts=timer.elapsed_ms(),
+                    )
+
+            elif kind == "on_chat_model_stream":
+                if defer_final_answer:
+                    continue
+                chunk = event["data"].get("chunk")
+                if chunk and hasattr(chunk, "content") and chunk.content:
+                    if not (hasattr(chunk, "tool_calls") and chunk.tool_calls):
+                        streamed_text.append(str(chunk.content))
+                        yield format_sse_event("text-delta", delta=chunk.content)
+
+        if defer_final_answer and settings.show_final_verifier_trace_step:
             yield format_sse_event(
                 "thinking-step",
-                step=step,
-                stepId=step_id,
-                stepKind="llm",
+                step="Validate the final answer against recent context and tool results.",
                 ts=timer.elapsed_ms(),
             )
+            yield format_sse_event("status", text="Verifying final answer…", ts=timer.elapsed_ms())
 
-        elif kind == "on_chat_model_end":
-            if not settings.show_llm_trace_steps:
-                continue
-            start = llm_start_times.pop(event["run_id"], perf_counter())
-            step_id = llm_step_ids.pop(event["run_id"], "")
-            duration_ms = max(round((perf_counter() - start) * 1000), 1)
-            if step_id:
-                yield format_sse_event(
-                    "thinking-step-finish",
-                    stepId=step_id,
-                    durationMs=duration_ms,
-                    durationText=_format_elapsed_ms(duration_ms),
-                    ts=timer.elapsed_ms(),
-                )
-            else:
-                yield format_sse_event(
-                    "status",
-                    text=f"LLM step completed in {_format_elapsed_ms(duration_ms)}",
-                    ts=timer.elapsed_ms(),
-                )
-
-        elif kind == "on_chat_model_stream":
-            if defer_final_answer:
-                # Defer rendering assistant text until the graph finishes so the
-                # verifier hook can rewrite the final answer if needed.
-                continue
-            chunk = event["data"].get("chunk")
-            if chunk and hasattr(chunk, "content") and chunk.content:
-                if not (hasattr(chunk, "tool_calls") and chunk.tool_calls):
-                    yield format_sse_event("text-delta", delta=chunk.content)
-
-    if defer_final_answer and settings.show_final_verifier_trace_step:
-        yield format_sse_event(
-            "thinking-step",
-            step="Validate the final answer against recent context and tool results.",
-            ts=timer.elapsed_ms(),
-        )
-        yield format_sse_event("status", text="Verifying final answer…", ts=timer.elapsed_ms())
-
-    if defer_final_answer:
         final_text = ""
-        if hasattr(agent, "aget_state"):
-            snapshot = await agent.aget_state(config)
-            messages = snapshot.values.get("messages", []) if snapshot and snapshot.values else []
-            for msg in reversed(messages):
-                if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
-                    final_text = msg.content if isinstance(msg.content, str) else str(msg.content)
-                    break
-        if final_text:
-            yield format_sse_event("text-delta", delta=final_text)
-    yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
+        if defer_final_answer:
+            if hasattr(agent, "aget_state"):
+                snapshot = await agent.aget_state(config)
+                messages = snapshot.values.get("messages", []) if snapshot and snapshot.values else []
+                for msg in reversed(messages):
+                    if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
+                        final_text = msg.content if isinstance(msg.content, str) else str(msg.content)
+                        break
+            if final_text:
+                yield format_sse_event("text-delta", delta=final_text)
+        else:
+            final_text = "".join(streamed_text).strip()
+
+        if (
+            semantic_cache_service.enabled
+            and cache_lookup_eligible
+            and cache_lookup_class in {"public", "group"}
+            and final_text
+        ):
+            resolved_store_class: str | None = None
+            if cache_write_flags["non_cacheable"]:
+                resolved_store_class = None
+            elif cache_write_flags["group"]:
+                resolved_store_class = "group"
+            elif cache_write_flags["public"]:
+                resolved_store_class = "public"
+
+            if resolved_store_class == cache_lookup_class:
+                await semantic_cache_service.store(
+                    prompt=latest_message,
+                    response=final_text,
+                    access_class=cache_lookup_class,
+                    group_id=cache_group_id if cache_lookup_class == "group" else None,
+                    metadata={
+                        "lookup_class": cache_lookup_class,
+                        "group_id": cache_group_id if cache_lookup_class == "group" else None,
+                    },
+                )
+
+        yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
 
 
 async def rag_event_stream(question: str) -> AsyncIterator[str]:
