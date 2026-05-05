@@ -18,13 +18,24 @@ from backend.app.contracts import ChatRequest
 from backend.app.internal_tools import InternalToolService, domain_runtime_config, internal_tool_names
 from backend.app.langgraph_agent import create_agent, create_checkpointer
 from backend.app.rag_service import SimpleRAGService
+from backend.app.radish_input_router import (
+    RadishRouterUnavailableError,
+    get_radish_router,
+    make_radish_bank_lifespan,
+    radish_blocked_sse,
+    radish_router_unavailable_sse,
+)
 from backend.app.sse import format_sse_event
 from backend.app.settings import get_settings
 
 settings = get_settings()
 domain = get_active_domain(settings)
 ROOT_DIR = Path(__file__).resolve().parents[2]
-app = FastAPI(title=f"{domain.manifest.branding.app_name} Demo")
+
+app = FastAPI(
+    title=f"{domain.manifest.branding.app_name} Demo",
+    lifespan=make_radish_bank_lifespan(settings),
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.cors_origin, "http://localhost:3040", "http://127.0.0.1:3040"],
@@ -163,13 +174,13 @@ async def domain_config() -> JSONResponse:
 
 async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
     timer = Timer()
+    latest_message = request.messages[-1].content if request.messages else ""
     yield format_sse_event("status", text="Initializing agent…", ts=timer.elapsed_ms())
 
     agent = await get_agent()
     defer_final_answer = runtime_config.get("enable_post_model_verifier", False)
 
     thread_id = request.thread_id or "default"
-    latest_message = request.messages[-1].content if request.messages else ""
 
     config = {"configurable": {"thread_id": thread_id}}
 
@@ -304,6 +315,26 @@ async def rag_event_stream(question: str) -> AsyncIterator[str]:
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest) -> StreamingResponse:
     question = request.messages[-1].content if request.messages else ""
+
+    if settings.demo_domain == "radish-bank":
+        try:
+            label, _ = get_radish_router(settings).classify(question)
+        except RadishRouterUnavailableError:
+            return StreamingResponse(
+                radish_router_unavailable_sse(),
+                media_type="text/event-stream",
+                status_code=503,
+            )
+        if label == "malicious":
+            return StreamingResponse(
+                radish_blocked_sse(malicious=True),
+                media_type="text/event-stream",
+            )
+        if label == "off_topic":
+            return StreamingResponse(
+                radish_blocked_sse(malicious=False),
+                media_type="text/event-stream",
+            )
 
     if request.mode == "simple_rag":
         return StreamingResponse(rag_event_stream(question), media_type="text/event-stream")

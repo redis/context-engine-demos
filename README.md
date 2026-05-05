@@ -23,6 +23,7 @@ The repo currently includes built-in demo domains for:
 - `electrohub` — electronics retail and order support
 - `finance-researcher` — ShiftIQ watchlist research across filings, metrics, prices, and live updates
 - `healthcare` — RedHealthConnect patient success portal (appointments, referrals, providers)
+- `radish-bank` — Radish Bank retail demo (accounts, FDs, insurance, branches, fee waivers + policy docs)
 
 **Two modes, same UI:**
 
@@ -131,6 +132,9 @@ Open http://localhost:3040 and try:
 - In `healthcare`:
   - *"Do I have any upcoming appointments?"*
   - *"Find me a cardiologist accepting new patients?"*
+- In `radish-bank`:
+  - *"What accounts do I have and what are my balances?"*
+  - *"Place 2000 SGD into the 6-month fixed deposit from my savings account."*
 
 ---
 
@@ -188,6 +192,8 @@ The `healthcare` domain models a patient success portal with six entity types:
 
 Healthcare schema definitions live in [`domains/healthcare/schema.py`](domains/healthcare/schema.py).
 
+The `radish-bank` domain is a compact retail-banking demo (single customer): accounts, cards, FD and insurance catalogs, branches with hours, holdings, service requests, and **BankDocument** rows for vector RAG. Schema lives in [`domains/radish-bank/schema.py`](domains/radish-bank/schema.py).
+
 ---
 
 ## Demo Paths
@@ -198,6 +204,7 @@ See:
 - [`domains/electrohub/docs/demo_paths.md`](domains/electrohub/docs/demo_paths.md)
 - [`domains/finance-researcher/docs/demo_paths.md`](domains/finance-researcher/docs/demo_paths.md)
 - [`domains/healthcare/docs/demo_paths.md`](domains/healthcare/docs/demo_paths.md)
+- [`domains/radish-bank/docs/demo_paths.md`](domains/radish-bank/docs/demo_paths.md)
 
 Reddash includes four scripted conversation flows:
 
@@ -266,7 +273,8 @@ context-engine-demos/
 │   ├── reddash/             # Delivery-support reference domain
 │   ├── electrohub/          # Electronics retail reference domain
 │   ├── finance-researcher/  # ShiftIQ watchlist research domain
-│   └── healthcare/          # Patient success portal domain
+│   ├── healthcare/          # Patient success portal domain
+│   └── radish-bank/          # Retail banking + policy-doc RAG demo
 │       ├── domain.py        # DOMAIN export implementing the contract
 │       ├── schema.py        # Entity definitions
 │       ├── prompt.py        # Domain prompt/playbooks

@@ -1,0 +1,1 @@
+"""Radish Bank domain."""

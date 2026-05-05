@@ -43,6 +43,8 @@ type ChatMessage = {
   thinkingSteps: ThinkingStep[];
   toolEvents: ToolEvent[];
   totalElapsedMs?: number;
+  /** Server ended chat (e.g. security); keep thread read-only until user clears or switches mode. */
+  sessionTerminated?: boolean;
 };
 
 type HealthState = {
@@ -678,6 +680,7 @@ export default function App() {
   const liveFeedHydratedRef = useRef(false);
   const liveFeedTickerTimeoutRef = useRef<number | null>(null);
   const hasMessages = messages.length > 0;
+  const sessionHalted = messages.some((m) => m.sessionTerminated);
 
   useEffect(() => {
     void fetch("/api/health")
@@ -776,7 +779,7 @@ export default function App() {
   async function submitPrompt(prompt: string, event?: FormEvent) {
     event?.preventDefault();
     const trimmed = prompt.trim();
-    if (!trimmed || isLoading) return;
+    if (!trimmed || isLoading || sessionHalted) return;
 
     const emptyMsg = (): ChatMessage => ({ id: "", role: "assistant", content: "", statusMessages: [], thinkingSteps: [], toolEvents: [] });
     const userMsg: ChatMessage = { ...emptyMsg(), id: `user-${Date.now()}`, role: "user" , content: trimmed };
@@ -852,6 +855,8 @@ export default function App() {
                   }] };
                 case "text-delta":
                   return { ...m, content: m.content + (ev.delta ?? "") };
+                case "session-terminated":
+                  return { ...m, sessionTerminated: true };
                 case "done":
                   return { ...m, totalElapsedMs: ev.totalElapsedMs };
                 default:
@@ -1140,10 +1145,13 @@ export default function App() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleComposerKeyDown}
               placeholder={domain?.placeholder_text ?? "Ask a question..."}
+              disabled={isLoading || sessionHalted}
             />
             <div className="composer-footer">
-              <div className="composer-hint">Press Enter to send</div>
-              <button className="send-button" type="submit" disabled={isLoading}>Send</button>
+              <div className="composer-hint">
+                {sessionHalted ? "Session ended — switch mode or refresh to start over." : "Press Enter to send"}
+              </div>
+              <button className="send-button" type="submit" disabled={isLoading || sessionHalted}>Send</button>
             </div>
           </form>
 
@@ -1152,7 +1160,15 @@ export default function App() {
               <div className="quick-starts-label">Try asking</div>
               <div className="quick-starts-row">
                 {(domain?.starter_prompts ?? []).map((p) => (
-                  <button key={p.title} className="quick-start-chip" onClick={() => handleQuickStart(p.prompt)} type="button">{p.title}</button>
+                  <button
+                    key={p.title}
+                    className="quick-start-chip"
+                    onClick={() => handleQuickStart(p.prompt)}
+                    type="button"
+                    disabled={sessionHalted}
+                  >
+                    {p.title}
+                  </button>
                 ))}
               </div>
             </div>
