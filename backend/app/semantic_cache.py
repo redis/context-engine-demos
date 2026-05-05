@@ -7,14 +7,13 @@ from typing import Any, Literal
 from langchain_core.messages import AIMessage, HumanMessage
 from redisvl.extensions.cache.llm import SemanticCache
 from redisvl.query.filter import Tag
-from redisvl.utils.vectorize import OpenAITextVectorizer
+from redisvl.utils.vectorize import HFTextVectorizer
 
 from backend.app.redis_connection import build_redis_url
 from backend.app.settings import Settings
 
 log = logging.getLogger(__name__)
 
-LookupClass = Literal["public", "group", "skip"]
 StoreClass = Literal["public", "group", "non-cacheable", "ignored"]
 
 
@@ -34,20 +33,7 @@ class SemanticCacheService:
 
     @property
     def enabled(self) -> bool:
-        return bool(
-            self.config
-            and getattr(self.config, "enabled", False)
-            and self.settings.openai_api_key
-        )
-
-    def classify_lookup(self, question: str, user_profile: dict[str, Any] | None) -> LookupClass:
-        if not self.enabled:
-            return "skip"
-        classifier = getattr(self.domain, "classify_semantic_cache_lookup", None)
-        if not callable(classifier):
-            return "skip"
-        result = classifier(question=question, user_profile=user_profile)
-        return result if result in {"public", "group"} else "skip"
+        return bool(self.config and getattr(self.config, "enabled", False))
 
     def classify_mcp_tool(self, tool_name: str) -> StoreClass:
         classifier = getattr(self.domain, "classify_mcp_semantic_cache_access", None)
@@ -56,30 +42,47 @@ class SemanticCacheService:
         result = classifier(tool_name=tool_name)
         return result if result in {"public", "group", "non-cacheable"} else "ignored"
 
-    def build_filter_expression(self, *, lookup_class: LookupClass, group_id: str | None) -> Any | None:
+    def build_filter_policy(self, *, group_id: str | None) -> dict[str, Any]:
+        return {
+            "allowPublic": True,
+            "groupId": group_id or None,
+        }
+
+    def build_read_filter_expression(self, *, group_id: str | None) -> Any:
         domain_expr = (Tag("domain_id") == self.domain.manifest.id) & (Tag("mode") == "context_surfaces") & (
             Tag("model_name") == self.settings.openai_chat_model
         )
-        if lookup_class == "public":
-            return domain_expr & (Tag("access_class") == "public")
-        if lookup_class == "group" and group_id:
+        if group_id:
             return domain_expr & (
-                ((Tag("access_class") == "public") | ((Tag("access_class") == "group") & (Tag("group_id") == group_id)))
+                (Tag("access_class") == "public")
+                | ((Tag("access_class") == "group") & (Tag("group_id") == group_id))
             )
-        return None
+        return domain_expr & (Tag("access_class") == "public")
+
+    def resolve_store_access(
+        self,
+        *,
+        saw_public: bool,
+        saw_group: bool,
+        saw_non_cacheable: bool,
+    ) -> tuple[Literal["public", "group"] | None, str]:
+        if saw_non_cacheable:
+            return None, "non-cacheable provenance"
+        if saw_group:
+            return "group", "group provenance"
+        if saw_public:
+            return "public", "public provenance"
+        return None, "no cacheable provenance"
 
     async def check(
         self,
         *,
         prompt: str,
-        lookup_class: LookupClass,
         group_id: str | None,
     ) -> SemanticCacheHit | None:
-        if not self.enabled or lookup_class == "skip":
+        if not self.enabled:
             return None
-        filter_expression = self.build_filter_expression(lookup_class=lookup_class, group_id=group_id)
-        if filter_expression is None:
-            return None
+        filter_expression = self.build_read_filter_expression(group_id=group_id)
         hits = await self._get_cache().acheck(
             prompt=prompt,
             num_results=1,
@@ -163,6 +166,36 @@ class SemanticCacheService:
             return False
         return True
 
+    def warmup(self, *, text: str = "semantic cache startup warmup") -> None:
+        if not self.enabled:
+            return
+        cache = self._get_cache()
+        vectorizer = getattr(cache, "_vectorizer", None)
+        embed = getattr(vectorizer, "embed", None)
+        if not callable(embed):
+            return
+        try:
+            embed(text)
+            log.info("Semantic cache vectorizer warmed up")
+        except Exception:
+            log.exception("Unable to warm up semantic cache vectorizer")
+
+    def close(self) -> None:
+        if self._cache is None:
+            return
+        try:
+            self._cache.disconnect()
+        except Exception:
+            log.exception("Unable to disconnect semantic cache cleanly")
+        vectorizer = getattr(self._cache, "_vectorizer", None)
+        client = getattr(vectorizer, "_client", None)
+        if client is not None:
+            try:
+                del client
+            except Exception:
+                log.exception("Unable to release semantic cache vectorizer client")
+        self._cache = None
+
     def _get_cache(self) -> SemanticCache:
         if self._cache is not None:
             return self._cache
@@ -170,9 +203,8 @@ class SemanticCacheService:
             name=self.config.cache_name,
             distance_threshold=self.config.distance_threshold,
             ttl=self.config.ttl_seconds,
-            vectorizer=OpenAITextVectorizer(
-                model=self.settings.openai_embedding_model,
-                api_config={"api_key": self.settings.openai_api_key},
+            vectorizer=HFTextVectorizer(
+                model=self.settings.semantic_cache_embedding_model,
             ),
             filterable_fields=[
                 {"name": "domain_id", "type": "tag"},
@@ -182,5 +214,10 @@ class SemanticCacheService:
                 {"name": "group_id", "type": "tag"},
             ],
             redis_url=build_redis_url(self.settings),
+            connection_kwargs={
+                "max_connections": self.settings.redis_max_connections,
+                "health_check_interval": 30,
+            },
+            overwrite=True,
         )
         return self._cache

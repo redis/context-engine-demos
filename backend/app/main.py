@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import atexit
+import asyncio
 import base64
 import json
+import logging
 from pathlib import Path
+from threading import Lock
 from time import perf_counter
 from typing import Any, AsyncIterator
 from uuid import uuid4
@@ -21,10 +25,11 @@ from backend.app.internal_tools import InternalToolService, domain_runtime_confi
 from backend.app.langgraph_agent import create_agent, create_checkpointer
 from backend.app.request_context import request_context_scope
 from backend.app.rag_service import SimpleRAGService
-from backend.app.semantic_cache import LookupClass, SemanticCacheService
+from backend.app.semantic_cache import SemanticCacheService
 from backend.app.sse import format_sse_event
 from backend.app.settings import get_settings
 
+log = logging.getLogger(__name__)
 settings = get_settings()
 domain = get_active_domain(settings)
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -45,6 +50,8 @@ semantic_cache_service = SemanticCacheService(settings, domain)
 
 _langgraph_agent = None
 _checkpointer = None
+_cleanup_lock = Lock()
+_background_resources_cleaned = False
 
 
 async def get_agent():
@@ -164,6 +171,64 @@ def _resolve_demo_user(request: ChatRequest) -> dict[str, Any] | None:
     return resolver(selected_id)
 
 
+def _cleanup_process_resources() -> None:
+    global _background_resources_cleaned
+    with _cleanup_lock:
+        if _background_resources_cleaned:
+            return
+        _background_resources_cleaned = True
+
+    semantic_cache_service.close()
+
+    try:
+        from joblib.externals.loky import reusable_executor as loky_reusable_executor
+
+        executor = getattr(loky_reusable_executor, "_executor", None)
+        if executor is not None:
+            executor.shutdown(wait=True, kill_workers=True)
+            loky_reusable_executor._executor = None
+    except Exception:
+        log.exception("Unable to shut down loky reusable executor cleanly")
+
+    try:
+        from joblib.externals.loky.backend import resource_tracker as loky_resource_tracker
+
+        tracker = getattr(loky_resource_tracker, "_resource_tracker", None)
+        if tracker is not None and getattr(tracker, "_fd", None) is not None:
+            tracker._stop()
+    except Exception:
+        log.exception("Unable to stop loky resource tracker cleanly")
+
+    try:
+        import multiprocessing.resource_tracker as multiprocessing_resource_tracker
+
+        tracker = multiprocessing_resource_tracker._resource_tracker
+        if tracker is not None and getattr(tracker, "_fd", None) is not None:
+            tracker._stop()
+    except Exception:
+        log.exception("Unable to stop multiprocessing resource tracker cleanly")
+
+
+atexit.register(_cleanup_process_resources)
+
+
+@app.on_event("startup")
+async def startup_resources() -> None:
+    if semantic_cache_service.enabled:
+        await asyncio.to_thread(semantic_cache_service.warmup)
+
+
+@app.on_event("shutdown")
+async def shutdown_resources() -> None:
+    _cleanup_process_resources()
+    global _checkpointer
+    if _checkpointer is not None and hasattr(_checkpointer, "aclose"):
+        try:
+            await _checkpointer.aclose()
+        except Exception:
+            log.exception("Unable to close LangGraph checkpointer cleanly")
+
+
 @app.get("/api/health")
 async def health() -> JSONResponse:
     mcp_tool_names = [tool.get("name", "") for tool in await cs_service.list_tools()]
@@ -214,44 +279,36 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
 
     with request_context_scope(demo_user_id=request.demo_user_id, demo_user=demo_user):
         cache_write_flags = {"public": False, "group": False, "non_cacheable": False}
+        cache_provenance = {"public": set(), "group": set(), "non_cacheable": set()}
         cache_lookup_eligible = False
-        cache_lookup_class: LookupClass = "skip"
         streamed_text: list[str] = []
 
         if semantic_cache_service.enabled:
             cache_lookup_eligible = len(request.messages) == 1 and await semantic_cache_service.thread_is_fresh(agent, config)
-            cache_lookup_class = semantic_cache_service.classify_lookup(latest_message, demo_user)
-            cache_payload = {
+            cache_request_payload = {
                 "question": latest_message,
                 "eligible": cache_lookup_eligible,
-                "lookupClass": cache_lookup_class,
-                "groupId": cache_group_id or None,
+                "cacheGroupId": cache_group_id or None,
             }
-            cache_run_id = f"cache-gate-{uuid4()}"
-            cache_started = perf_counter()
-            yield format_sse_event(
-                "tool-call",
-                toolName="semantic_cache_gate",
-                toolKind="cache",
-                runId=cache_run_id,
-                payload=cache_payload,
-                ts=timer.elapsed_ms(),
-            )
-            bypass_reason = ""
             cache_hit = None
+            cache_outcome = "skip"
+            cache_reason = ""
+            cache_duration_ms = 1
             if not cache_lookup_eligible:
-                bypass_reason = "single-turn cache requires a fresh thread"
-            elif cache_lookup_class == "skip":
-                bypass_reason = "request class is not cacheable"
+                cache_reason = "single-turn cache requires a fresh thread"
             else:
+                cache_request_payload["filterPolicy"] = semantic_cache_service.build_filter_policy(
+                    group_id=cache_group_id or None
+                )
+                cache_started = perf_counter()
                 cache_hit = await semantic_cache_service.check(
                     prompt=latest_message,
-                    lookup_class=cache_lookup_class,
                     group_id=cache_group_id or None,
                 )
+                cache_duration_ms = max(round((perf_counter() - cache_started) * 1000), 1)
+                cache_outcome = "hit" if cache_hit is not None else "miss"
 
-            cache_duration_ms = max(round((perf_counter() - cache_started) * 1000), 1)
-            if cache_hit is not None:
+            if cache_hit is not None and cache_outcome == "hit":
                 persisted = await semantic_cache_service.persist_cached_turn(
                     agent=agent,
                     config=config,
@@ -259,14 +316,23 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                     answer=cache_hit.response,
                 )
                 if persisted:
+                    cache_run_id = f"cache-hit-{uuid4()}"
+                    yield format_sse_event(
+                        "tool-call",
+                        toolName="Semantic cache hit",
+                        toolKind="cache",
+                        runId=cache_run_id,
+                        payload=cache_request_payload,
+                        ts=timer.elapsed_ms(),
+                    )
                     yield format_sse_event(
                         "tool-result",
-                        toolName="semantic_cache_gate",
+                        toolName="Semantic cache hit",
                         toolKind="cache",
                         runId=cache_run_id,
                         payload={
                             "result": "hit",
-                            "accessClass": cache_hit.filters.get("access_class") or cache_lookup_class,
+                            "accessClass": cache_hit.filters.get("access_class") or None,
                             "groupId": cache_hit.filters.get("group_id") or None,
                         },
                         durationMs=cache_duration_ms,
@@ -276,22 +342,53 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                     yield format_sse_event("text-delta", delta=cache_hit.response)
                     yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
                     return
-                bypass_reason = "cached turn could not be persisted into thread state"
+                cache_outcome = "skip"
+                cache_reason = "cached turn could not be persisted into thread state"
 
-            if bypass_reason:
+            if cache_outcome == "skip":
+                cache_run_id = f"cache-skip-{uuid4()}"
+                yield format_sse_event(
+                    "tool-call",
+                    toolName="Semantic cache skip",
+                    toolKind="cache",
+                    runId=cache_run_id,
+                    payload=cache_request_payload,
+                    ts=timer.elapsed_ms(),
+                )
                 cache_result_payload: dict[str, Any] = {
-                    "result": "bypass",
-                    "reason": bypass_reason,
-                    "accessClass": cache_lookup_class,
+                    "result": "skip",
+                    "reason": cache_reason,
                 }
-            else:
+            elif cache_outcome == "miss":
+                cache_run_id = f"cache-miss-{uuid4()}"
+                yield format_sse_event(
+                    "tool-call",
+                    toolName="Semantic cache miss",
+                    toolKind="cache",
+                    runId=cache_run_id,
+                    payload=cache_request_payload,
+                    ts=timer.elapsed_ms(),
+                )
                 cache_result_payload = {
                     "result": "miss",
-                    "accessClass": cache_lookup_class,
+                }
+            else:
+                cache_run_id = f"cache-skip-{uuid4()}"
+                yield format_sse_event(
+                    "tool-call",
+                    toolName="Semantic cache skip",
+                    toolKind="cache",
+                    runId=cache_run_id,
+                    payload=cache_request_payload,
+                    ts=timer.elapsed_ms(),
+                )
+                cache_result_payload = {
+                    "result": "skip",
+                    "reason": cache_reason or "cache lookup was not used",
                 }
             yield format_sse_event(
                 "tool-result",
-                toolName="semantic_cache_gate",
+                toolName="Semantic cache skip" if cache_outcome == "skip" else "Semantic cache miss",
                 toolKind="cache",
                 runId=cache_run_id,
                 payload=cache_result_payload,
@@ -324,18 +421,24 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                     if access.access_control_enabled:
                         if access.access_class_override == "public":
                             cache_write_flags["public"] = True
+                            cache_provenance["public"].add(name)
                         elif access.access_class_override == "group":
                             cache_write_flags["group"] = True
+                            cache_provenance["group"].add(name)
                         elif access.access_class_override == "non-cacheable":
                             cache_write_flags["non_cacheable"] = True
+                            cache_provenance["non_cacheable"].add(name)
                 else:
                     access_class = semantic_cache_service.classify_mcp_tool(name)
                     if access_class == "public":
                         cache_write_flags["public"] = True
+                        cache_provenance["public"].add(name)
                     elif access_class == "group":
                         cache_write_flags["group"] = True
+                        cache_provenance["group"].add(name)
                     elif access_class == "non-cacheable":
                         cache_write_flags["non_cacheable"] = True
+                        cache_provenance["non_cacheable"].add(name)
 
                 thinking_step = _thinking_step_for_tool(name, tool_input)
                 if thinking_step and thinking_step != last_thinking_step:
@@ -438,31 +541,57 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
         else:
             final_text = "".join(streamed_text).strip()
 
-        if (
-            semantic_cache_service.enabled
-            and cache_lookup_eligible
-            and cache_lookup_class in {"public", "group"}
-            and final_text
-        ):
-            resolved_store_class: str | None = None
-            if cache_write_flags["non_cacheable"]:
-                resolved_store_class = None
-            elif cache_write_flags["group"]:
-                resolved_store_class = "group"
-            elif cache_write_flags["public"]:
-                resolved_store_class = "public"
-
-            if resolved_store_class == cache_lookup_class:
-                await semantic_cache_service.store(
+        if semantic_cache_service.enabled and final_text and cache_lookup_eligible:
+            resolved_store_class, store_reason = semantic_cache_service.resolve_store_access(
+                saw_public=cache_write_flags["public"],
+                saw_group=cache_write_flags["group"],
+                saw_non_cacheable=cache_write_flags["non_cacheable"],
+            )
+            provenance_summary = {
+                "public": sorted(cache_provenance["public"]),
+                "group": sorted(cache_provenance["group"]),
+                "nonCacheable": sorted(cache_provenance["non_cacheable"]),
+            }
+            if resolved_store_class in {"public", "group"} and not (
+                resolved_store_class == "group" and not cache_group_id
+            ):
+                write_started = perf_counter()
+                stored = await semantic_cache_service.store(
                     prompt=latest_message,
                     response=final_text,
-                    access_class=cache_lookup_class,
-                    group_id=cache_group_id if cache_lookup_class == "group" else None,
+                    access_class=resolved_store_class,
+                    group_id=cache_group_id if resolved_store_class == "group" else None,
                     metadata={
-                        "lookup_class": cache_lookup_class,
-                        "group_id": cache_group_id if cache_lookup_class == "group" else None,
+                        "resolved_access_class": resolved_store_class,
+                        "cache_group_id": cache_group_id if resolved_store_class == "group" else None,
+                        "provenance_summary": provenance_summary,
                     },
                 )
+                if stored:
+                    write_request_payload = {
+                        "question": latest_message,
+                        "resolvedAccessClass": resolved_store_class,
+                        "cacheGroupId": cache_group_id or None,
+                        "provenanceSummary": provenance_summary,
+                    }
+                    write_run_id = f"cache-write-{uuid4()}"
+                    yield format_sse_event(
+                        "tool-call",
+                        toolName="Semantic cache write",
+                        toolKind="cache",
+                        runId=write_run_id,
+                        payload=write_request_payload,
+                        ts=timer.elapsed_ms(),
+                    )
+                    yield format_sse_event(
+                        "tool-result",
+                        toolName="Semantic cache write",
+                        toolKind="cache",
+                        runId=write_run_id,
+                        payload={"result": "stored"},
+                        durationMs=max(round((perf_counter() - write_started) * 1000), 1),
+                        ts=timer.elapsed_ms(),
+                    )
 
         yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
 
