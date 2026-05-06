@@ -1,7 +1,7 @@
 [project]
 name = "context-engine-demos"
 version = "0.1.0"
-description = "Context Engine Demos – multi-domain demo apps powered by Redis Context Surfaces."
+description = "Context Engine Demos – multi-domain demo apps powered by Redis Context Retriever."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"

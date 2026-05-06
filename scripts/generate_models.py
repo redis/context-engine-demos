@@ -1,4 +1,4 @@
-"""Generate ContextModel classes for a domain pack."""
+"""Generate Context Retriever model classes for a domain pack."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def render(domain_id: str) -> str:
     domain = load_domain(domain_id)
 
     chunks = [
-        f'"""Generated Context Surface models for the {domain.manifest.branding.app_name} domain."""',
+        f'"""Generated Context Retriever models for the {domain.manifest.branding.app_name} domain."""',
         "",
         "from __future__ import annotations",
         "",

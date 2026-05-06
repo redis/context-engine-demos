@@ -77,7 +77,7 @@ class HealthcareDomain:
             checkpoint_prefix="healthcare:checkpoint",
             checkpoint_write_prefix="healthcare:checkpoint_write",
             redis_instance_name="Healthcare Redis Cloud",
-            surface_name="Healthcare Surface",
+            surface_name="Healthcare Retriever",
             agent_name="Healthcare Agent",
         ),
         rag=RagConfig(

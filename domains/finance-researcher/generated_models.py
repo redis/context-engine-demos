@@ -1,4 +1,4 @@
-"""Generated Context Surface models for the ShiftIQ domain."""
+"""Generated Context Retriever models for the ShiftIQ domain."""
 
 from __future__ import annotations
 

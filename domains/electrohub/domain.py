@@ -91,7 +91,7 @@ class ElectrohubDomain:
             checkpoint_prefix="electrohub:checkpoint",
             checkpoint_write_prefix="electrohub:checkpoint_write",
             redis_instance_name="ElectroHub Redis Cloud",
-            surface_name="ElectroHub Commerce Surface",
+            surface_name="ElectroHub Commerce Retriever",
             agent_name="ElectroHub Commerce Agent",
         ),
         rag=RagConfig(

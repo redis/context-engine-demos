@@ -121,7 +121,7 @@ class {title.replace(" ", "")}Domain:
             checkpoint_prefix="{domain_id}:checkpoint",
             checkpoint_write_prefix="{domain_id}:checkpoint_write",
             redis_instance_name="{title} Redis Cloud",
-            surface_name="{title} Surface",
+            surface_name="{title} Retriever",
             agent_name="{title} Agent",
         ),
         rag=RagConfig(

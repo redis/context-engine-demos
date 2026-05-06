@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ShiftIQ Context Surfaces Model Browser</title>
+<title>ShiftIQ Context Retriever Model Browser</title>
 <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.11.1/styles/atom-one-dark.min.css" />
 <style>
 :root { --bg:#081018; --panel:#101a26; --line:rgba(111,211,255,.18); --text:#eef4fb; --muted:#9fb0c2; --accent:#6fd3ff; }
@@ -26,19 +26,19 @@ pre code.hljs { padding:22px; background:#0a111a; }
 </head>
 <body>
 <main id="top">
-<h1>ShiftIQ Context Surfaces Model Browser</h1>
-<p>Browser-friendly view of the annotated Context Surfaces data model classes used by the ShiftIQ finance demo. These are the generated models that drive the MCP tool surface.</p>
-<div class="callout"><strong>Best demo file</strong><span><code>domains/finance-researcher/generated_models.py</code> shows the exact <code>ContextField</code> and <code>ContextRelationship</code> annotations the surface registers, plus the import statements that make the model definition readable to engineers.</span></div>
-<nav><a href="#Imports">Imports</a><a href="#SurfaceSetup">Surface Setup</a><a href="#AnalystProfile">AnalystProfile</a><a href="#Company">Company</a><a href="#ResearchDocument">ResearchDocument</a><a href="#ResearchChunk">ResearchChunk</a><a href="#FinancialMetricPoint">FinancialMetricPoint</a><a href="#PriceBar">PriceBar</a><a href="#CoverageEvent">CoverageEvent</a></nav>
+<h1>ShiftIQ Context Retriever Model Browser</h1>
+<p>Browser-friendly view of the annotated Context Retriever data model classes used by the ShiftIQ finance demo. These are the generated models that drive the MCP tool surface.</p>
+<div class="callout"><strong>Best demo file</strong><span><code>domains/finance-researcher/generated_models.py</code> shows the exact <code>ContextField</code> and <code>ContextRelationship</code> annotations the retriever registers, plus the import statements that make the model definition readable to engineers.</span></div>
+<nav><a href="#Imports">Imports</a><a href="#RetrieverSetup">Retriever Setup</a><a href="#AnalystProfile">AnalystProfile</a><a href="#Company">Company</a><a href="#ResearchDocument">ResearchDocument</a><a href="#ResearchChunk">ResearchChunk</a><a href="#FinancialMetricPoint">FinancialMetricPoint</a><a href="#PriceBar">PriceBar</a><a href="#CoverageEvent">CoverageEvent</a></nav>
 <section id="Imports"><div class="section-head"><h2>Imports</h2><a href="#top">Back to top</a></div><pre><code>from __future__ import annotations
 
 from typing import Any
 
-from context_surfaces.context_model import ContextField, ContextModel, ContextRelationship</code></pre></section>
-<section id="SurfaceSetup"><div class="section-head"><h2>Surface Setup</h2><a href="#top">Back to top</a></div><pre><code>ctxctl profile use default</code></pre><pre><code>ctxctl context-surface create \
-  --name "ShiftIQ Research Surface" \
-  --data-model domains/finance-researcher/generated_models.py</code></pre><pre><code>ctxctl context-surface load \
-  --surface "ShiftIQ Research Surface" \
+from context_retriever.context_model import ContextField, ContextModel, ContextRelationship</code></pre></section>
+<section id="RetrieverSetup"><div class="section-head"><h2>Retriever Setup</h2><a href="#top">Back to top</a></div><pre><code>ctxctl profile use default</code></pre><pre><code>ctxctl context-retriever create \
+  --name "ShiftIQ Research Retriever" \
+  --data-model domains/finance-researcher/generated_models.py</code></pre><pre><code>ctxctl context-retriever load \
+  --retriever "ShiftIQ Research Retriever" \
   --entities output/finance-researcher/*.jsonl</code></pre></section>
 <section id="AnalystProfile"><div class="section-head"><h2>AnalystProfile</h2><a href="#top">Back to top</a></div><pre><code>class AnalystProfile(ContextModel):
     &quot;&quot;&quot;AnalystProfile entity for the Finance Researcher domain.&quot;&quot;&quot;

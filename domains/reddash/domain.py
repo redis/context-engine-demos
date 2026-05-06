@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class ReddashDomain:
     manifest = DomainManifest(
         id="reddash",
-        description="Food-delivery support demo comparing Context Surfaces vs simple RAG.",
+        description="Food-delivery support demo comparing Context Retriever vs simple RAG.",
         generated_models_module="domains.reddash.generated_models",
         generated_models_path="domains/reddash/generated_models.py",
         output_dir="output/reddash",
@@ -65,7 +65,7 @@ class ReddashDomain:
             checkpoint_prefix="reddash:checkpoint",
             checkpoint_write_prefix="reddash:checkpoint_write",
             redis_instance_name="Reddash Redis Cloud",
-            surface_name="Reddash Delivery Surface",
+            surface_name="Reddash Delivery Retriever",
             agent_name="Reddash Delivery Agent",
         ),
         rag=RagConfig(

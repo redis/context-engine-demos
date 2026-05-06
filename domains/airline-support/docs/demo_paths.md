@@ -4,7 +4,7 @@ These scripted paths are the source of truth for the `airline-support` domain.
 Schema, prompt design, and generated data should all exist to support these
 conversations cleanly.
 
-> Tip: Run each opening question once in Context Surfaces mode and then repeat
+> Tip: Run each opening question once in Context Retriever mode and then repeat
 > it in Simple RAG mode to show the difference between record-backed trip data
 > and generic policy guidance.
 

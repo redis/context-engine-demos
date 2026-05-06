@@ -1,4 +1,4 @@
-"""Generated Context Surface models for the Airline Support domain."""
+"""Generated Context Retriever models for the Airline Support domain."""
 
 from __future__ import annotations
 

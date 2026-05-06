@@ -5,15 +5,15 @@ DOMAIN ?= reddash
 EXTRA_ENV_FILE ?=
 
 .PHONY: help install backend-install frontend-install dev backend frontend \
-	generate-data generate-models load-data setup-surface validate-domain smoke-domain create-domain flush-redis reset \
+	generate-data generate-models load-data setup-surface setup-retriever validate-domain smoke-domain create-domain flush-redis reset \
 	publish-domain-event cache-domain-price-csvs
 
 help:
 	@echo "Targets:"
 	@echo "  make install          Install backend and frontend dependencies"
-	@echo "  make generate-models  Regenerate Context Surface model file for DOMAIN=$(DOMAIN)"
+	@echo "  make generate-models  Regenerate Context Retriever model file for DOMAIN=$(DOMAIN)"
 	@echo "  make generate-data    Generate sample JSONL data into output/DOMAIN"
-	@echo "  make setup-surface    Create surface & agent key using embedded Redis connection settings"
+	@echo "  make setup-retriever  Create retriever & agent key using embedded Redis connection settings"
 	@echo "  make load-data        Load output/DOMAIN/*.jsonl into Redis + Search indexes"
 	@echo "  make validate-domain  Validate the active domain pack"
 	@echo "  make smoke-domain     Generate models/data and verify the domain structure"
@@ -22,7 +22,7 @@ help:
 	@echo "  make cache-domain-price-csvs DOMAIN=<domain>  Run a domain-local price cache script when available"
 	@echo "    Optional: EXTRA_ENV_FILE=/path/to/shared.env"
 	@echo "  make flush-redis      Flush the Redis database (FLUSHDB)"
-	@echo "  make reset            Flush Redis + recreate surface + reload data"
+	@echo "  make reset            Flush Redis + recreate retriever + reload data"
 	@echo "  make backend          Start FastAPI backend"
 	@echo "  make frontend         Start Vite frontend"
 	@echo "  make dev              Run backend and frontend together"
@@ -44,8 +44,10 @@ generate-data:
 load-data:
 	@uv run python scripts/load_data.py --domain $(DOMAIN)
 
-setup-surface:
+setup-retriever:
 	@uv run python scripts/setup_surface.py --domain $(DOMAIN)
+
+setup-surface: setup-retriever
 
 validate-domain:
 	@uv run python scripts/validate_domain.py --domain $(DOMAIN)
@@ -94,14 +96,14 @@ flush-redis:
 	r.flushdb(); \
 	print('Flushed Redis at %s:%d/%d' % (s.redis_host, s.redis_port, s.redis_db))"
 	@echo ""
-	@echo "⚠️  Redis flushed. Context Surface indexes are gone."
-	@echo "   Run 'make reset' or 'make setup-surface && make load-data' to recover."
+	@echo "⚠️  Redis flushed. Context Retriever indexes are gone."
+	@echo "   Run 'make reset' or 'make setup-retriever && make load-data' to recover."
 
 reset: flush-redis
-	@echo "Clearing old surface credentials..."
+	@echo "Clearing old retriever credentials..."
 	@sed -i '' 's/^CTX_SURFACE_ID=.*/CTX_SURFACE_ID=/' .env
 	@sed -i '' 's/^MCP_AGENT_KEY=.*/MCP_AGENT_KEY=/' .env
-	@$(MAKE) setup-surface
+	@$(MAKE) setup-retriever
 	@$(MAKE) load-data
 	@echo ""
 	@echo "✅ Reset complete. Run 'make dev' to start."

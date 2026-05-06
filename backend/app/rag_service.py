@@ -80,7 +80,7 @@ class SimpleRAGService:
                 if tool.get("name", "").startswith("search_") and tool.get("name", "").endswith("_by_text")
             ]
         if not candidates:
-            raise RuntimeError(f"No {kind} search tool is available on the active Context Surface.")
+            raise RuntimeError(f"No {kind} search tool is available on the active Context Retriever.")
 
         target = _normalize_name(rag.index_name_contains)
         for tool_name in candidates:

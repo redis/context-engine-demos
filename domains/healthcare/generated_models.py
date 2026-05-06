@@ -1,4 +1,4 @@
-"""Generated Context Surface models for the RedHealthConnect domain."""
+"""Generated Context Retriever models for the RedHealthConnect domain."""
 
 from __future__ import annotations
 

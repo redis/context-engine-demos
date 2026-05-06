@@ -1,4 +1,4 @@
-"""Create or reuse the Context Surface for the active domain.
+"""Create or reuse the Context Retriever for the active domain.
 
 This script targets the current admin API contract, which expects
 embedded Redis connection settings under ``data_source.connection_config``
@@ -115,7 +115,7 @@ def _create_surface(
         )
     if response.status_code != 201:
         raise RuntimeError(
-            "Failed to create context surface "
+            "Failed to create Context Retriever "
             f"(status {response.status_code}): {_safe_response_text(response)}"
         )
     return response.json()
@@ -151,7 +151,7 @@ def _describe_surface(*, api_url: str, admin_key: str, surface_id: str) -> dict[
         )
     if response.status_code != 200:
         raise RuntimeError(
-            "Failed to describe context surface "
+            "Failed to describe Context Retriever "
             f"(status {response.status_code}): {_safe_response_text(response)}"
         )
     return response.json()
@@ -249,17 +249,17 @@ def main() -> None:
     agent_key = env.get("MCP_AGENT_KEY", "") if env_matches_target and not args.force_create else ""
 
     if surface_id:
-        print(f"Reusing context surface: {surface_id}")
+        print(f"Reusing Context Retriever: {surface_id}")
         try:
             _describe_surface(api_url=api_url, admin_key=settings.ctx_admin_key, surface_id=surface_id)
         except Exception as exc:
-            print(f"Existing surface is not usable: {exc}")
-            print("Run again with --force-create to create a fresh surface.")
+            print(f"Existing Context Retriever is not usable: {exc}")
+            print("Run again with --force-create to create a fresh Context Retriever.")
             sys.exit(1)
     else:
         print("Validating Redis connection settings...")
         _preflight_redis_connection()
-        print("Creating context surface with embedded Redis data source...")
+        print("Creating Context Retriever with embedded Redis data source...")
         data_model = _parse_data_model(generated_models_path, surface_name=surface_name)
         payload = _create_surface(
             api_url=api_url,
@@ -294,8 +294,8 @@ def main() -> None:
     upsert_env_values(ENV_PATH, updates)
 
     print("")
-    print("Context surface ready.")
-    print(f"  Surface ID:        {surface_id}")
+    print("Context Retriever ready.")
+    print(f"  Retriever ID:      {surface_id}")
     print("  Redis source:      embedded connection_config")
     print("  Agent key saved to .env as MCP_AGENT_KEY")
 

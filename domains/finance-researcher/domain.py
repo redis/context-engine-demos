@@ -380,8 +380,8 @@ class FinanceResearcherDomain:
             ui=UiConfig(
                 show_platform_surface=True,
                 show_live_updates=True,
-                platform_surface_title="Context Surfaces, RedisTimeSeries, and Redis Streams in one demo",
-                platform_data_planes=["Context Surfaces", "RedisTimeSeries", "Redis Streams"],
+                platform_surface_title="Context Retriever, RedisTimeSeries, and Redis Streams in one demo",
+                platform_data_planes=["Context Retriever", "RedisTimeSeries", "Redis Streams"],
                 live_updates_title="Redis Stream feed for Finance Researcher",
             ),
         ),
@@ -391,7 +391,7 @@ class FinanceResearcherDomain:
             checkpoint_prefix="finance-researcher:checkpoint",
             checkpoint_write_prefix="finance-researcher:checkpoint_write",
             redis_instance_name="Finance Researcher Redis Cloud",
-            surface_name="Finance Researcher Surface",
+            surface_name="Finance Researcher Retriever",
             agent_name="Finance Researcher Agent",
         ),
         rag=RagConfig(

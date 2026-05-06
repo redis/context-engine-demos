@@ -351,7 +351,7 @@
                 of just another vector store sitting beside it.
               </p>
               <div class="pill-row">
-                <span class="pill blue">Context Surfaces</span>
+                <span class="pill blue">Context Retriever</span>
                 <span class="pill green">RedisTimeSeries</span>
                 <span class="pill redis">Redis Streams</span>
               </div>
@@ -363,7 +363,7 @@
               </p>
               <ul class="flat">
                 <li>Durable agent memory with the Redis LangGraph checkpointer</li>
-                <li>A structured tool plane over live operational data with Context Surfaces</li>
+                <li>A structured tool plane over live operational data with Context Retriever</li>
                 <li>Real-time time-series and event data in the same platform</li>
               </ul>
             </div>
@@ -377,7 +377,7 @@
             <div class="card blue">
               <h3>1. Tool plane</h3>
               <ul class="flat">
-                <li>Context Surfaces turns Redis-backed business models into MCP tools.</li>
+                <li>Context Retriever turns Redis-backed business models into MCP tools.</li>
                 <li>No hand-built API wrapper per entity, filter, or search path.</li>
                 <li>The agent sees live tools, not prompt-described hopes.</li>
               </ul>
@@ -414,7 +414,7 @@
               <span class="arrow">→</span>
               <span class="node">Internal Tools</span>
               <span class="arrow">+</span>
-              <span class="node">Context Surfaces MCP Tools</span>
+              <span class="node">Context Retriever MCP Tools</span>
               <span class="arrow">→</span>
               <span class="node">Redis JSON + Search</span>
               <span class="arrow">+</span>
@@ -455,8 +455,8 @@
         </section>
 
         <section class="left">
-          <div class="eyebrow">Context Surfaces</div>
-          <h2>Redis Context Surfaces Removes The Custom Tool-Glue Tax</h2>
+          <div class="eyebrow">Context Retriever</div>
+          <h2>Redis Context Retriever Removes The Custom Tool-Glue Tax</h2>
           <div class="two-col">
             <div class="card">
               <pre><code class="language-python">class ResearchChunk(ContextModel):
@@ -494,7 +494,7 @@
                 <li><code>search_researchchunk_by_content_embedding_similarity</code></li>
               </ul>
               <p class="callout">
-                LangGraph still does the orchestration. Redis Context Surfaces gives it a
+                LangGraph still does the orchestration. Redis Context Retriever gives it a
                 structured, typed, domain-scoped tool surface over live Redis data.
               </p>
             </div>
@@ -541,7 +541,7 @@ async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str
         )
     return _normalize_tool_result_payload(result)</code></pre>
               <p class="small">
-                The tool inventory is not hardwired in the prompt. The app discovers it from the active Context Surface.
+                The tool inventory is not hardwired in the prompt. The app discovers it from the active Context Retriever.
               </p>
             </div>
           </div>
@@ -659,7 +659,7 @@ async def create_checkpointer(settings: Settings) -> AsyncRedisSaver:
               <ul class="flat">
                 <li>Checkpointing is the obvious first step if you already use LangGraph.</li>
                 <li>It gives you durable thread state without inventing your own persistence layer.</li>
-                <li>Once Redis is already in the loop, Context Surfaces, TimeSeries, and Streams extend that same platform into tool/data planes.</li>
+                <li>Once Redis is already in the loop, Context Retriever, TimeSeries, and Streams extend that same platform into tool/data planes.</li>
               </ul>
             </div>
           </div>
@@ -680,7 +680,7 @@ async def create_checkpointer(settings: Settings) -> AsyncRedisSaver:
               <tbody>
                 <tr>
                   <td>You still need tool adapters and data contracts.</td>
-                  <td>Context Surfaces generates the operational tool plane from the model.</td>
+                  <td>Context Retriever generates the operational tool plane from the model.</td>
                   <td>Less custom glue and less drift as the domain grows.</td>
                 </tr>
                 <tr>
@@ -716,7 +716,7 @@ async def create_checkpointer(settings: Settings) -> AsyncRedisSaver:
             <div class="card green">
               <div class="metric">
                 <strong>Phase 2</strong>
-                <span>Expose structured Redis data as Context Surfaces tools</span>
+                <span>Expose structured Redis data as Context Retriever tools</span>
               </div>
             </div>
             <div class="card redis">

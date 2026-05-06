@@ -105,7 +105,7 @@ class AirlineSupportDomain:
             checkpoint_prefix="airline_support:checkpoint",
             checkpoint_write_prefix="airline_support:checkpoint_write",
             redis_instance_name="Airline Support Redis Cloud",
-            surface_name="Airline Support Surface",
+            surface_name="Airline Support Retriever",
             agent_name="Airline Support Agent",
         ),
         rag=RagConfig(

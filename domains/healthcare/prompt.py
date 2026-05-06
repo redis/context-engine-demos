@@ -45,7 +45,7 @@ Internal tools (instant, local):
     Call this FIRST on every new question to identify who you're helping.
   • get_current_time — returns the current UTC timestamp (ISO 8601).
 
-Context Surface tools (query Redis via MCP):
+Context Retriever tools (query Redis via MCP):
 {tool_hint_block}
 
 ═══ CRITICAL RULES ═══
