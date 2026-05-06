@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from context_surfaces import UnifiedClient  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
 
 from backend.app.core.domain_loader import load_domain  # noqa: E402
 from backend.app.settings import get_settings  # noqa: E402
@@ -78,7 +79,20 @@ async def main() -> None:
     async with UnifiedClient() as client:
         for class_name, rows in raw_records.items():
             model_cls = generated_models[class_name]
-            model_instances = [model_cls(**row) for row in rows]
+            try:
+                model_instances = [model_cls(**row) for row in rows]
+            except ValidationError as exc:
+                file_name = next(
+                    spec.file_name for spec in entity_specs if spec.class_name == class_name
+                )
+                print(
+                    f"Generated data in {output_dir / file_name} does not match the current "
+                    f"{class_name} schema."
+                )
+                print(
+                    f"Rerun: uv run python scripts/generate_data.py --domain {domain.manifest.id}"
+                )
+                raise SystemExit(1) from exc
             result = await client.import_data(
                 admin_key=admin_key,
                 context_surface_id=surface_id,

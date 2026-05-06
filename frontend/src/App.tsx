@@ -79,6 +79,19 @@ type DomainConfig = {
   logo_src: string;
 } | null;
 
+function isLightColor(value?: string) {
+  if (!value) return false;
+  const hex = value.trim();
+  const match = hex.match(/^#([0-9a-fA-F]{6})$/);
+  if (!match) return false;
+  const raw = match[1];
+  const r = Number.parseInt(raw.slice(0, 2), 16);
+  const g = Number.parseInt(raw.slice(2, 4), 16);
+  const b = Number.parseInt(raw.slice(4, 6), 16);
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance > 0.72;
+}
+
 type DomainEvent = {
   stream_id: string;
   event_family: string;
@@ -704,6 +717,7 @@ export default function App() {
     Object.entries(domain.theme).forEach(([key, value]) => {
       document.documentElement.style.setProperty(`--${key.replaceAll("_", "-")}`, value);
     });
+    document.documentElement.style.colorScheme = isLightColor(domain.theme.bg) ? "light" : "dark";
   }, [domain]);
 
   useEffect(() => {

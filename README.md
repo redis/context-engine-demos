@@ -5,7 +5,7 @@
 **Reusable demo apps powered by Redis Context Surfaces**
 
 Domain-specific demo apps for agentic workflows over structured Redis data,
-with full tool-call visibility in a dark-mode chat UI.
+with full tool-call visibility in a themed chat UI.
 
 [Getting Started](#getting-started) · [Architecture](#architecture) · [Demo Paths](#demo-paths)
 
@@ -23,6 +23,7 @@ The repo currently includes built-in demo domains for:
 - `electrohub` — electronics retail and order support
 - `finance-researcher` — ShiftIQ watchlist research across filings, metrics, prices, and live updates
 - `healthcare` — RedHealthConnect patient success portal (appointments, referrals, providers)
+- `airline-support` — synthetic airline support across disruptions, reassignment, and traveller profile lookup
 
 **Two modes, same UI:**
 
@@ -132,6 +133,9 @@ Open http://localhost:3040 and try:
 - In `healthcare`:
   - *"Do I have any upcoming appointments?"*
   - *"Find me a cardiologist accepting new patients?"*
+- In `airline-support`:
+  - *"My flight was disrupted. What happened?"*
+  - *"Can I still check in for the new flight?"*
 
 ---
 
@@ -189,6 +193,20 @@ The `healthcare` domain models a patient success portal with six entity types:
 
 Healthcare schema definitions live in [`domains/healthcare/schema.py`](domains/healthcare/schema.py).
 
+The `airline-support` domain models a synthetic airline support workflow with seven entity types:
+
+| Entity | Key Pattern | Key Indexed Fields |
+|--------|-------------|-------------------|
+| **CustomerProfile** | `airline_support_customer_profile:{customer_id}` | travel_id, masked_loyalty_number, loyalty_tier |
+| **Booking** | `airline_support_booking:{booking_id}` | customer_id, booking_locator, trip_status |
+| **ItinerarySegment** | `airline_support_itinerary_segment:{segment_id}` | booking_id, operating_flight_id, flight_number |
+| **OperatingFlight** | `airline_support_operating_flight:{operating_flight_id}` | flight_number, service_date, operating_status |
+| **OperationalDisruption** | `airline_support_operational_disruption:{operational_disruption_id}` | operating_flight_id, disruption_type, disruption_reason_code |
+| **ReaccommodationRecord** | `airline_support_reaccommodation_record:{reaccommodation_record_id}` | customer_id, booking_id, reaccommodation_status |
+| **TravelPolicyDoc** | `airline_support_travel_policy_doc:{doc_id}` | title, category, content, content_embedding (vector) |
+
+Airline support schema definitions live in [`domains/airline-support/schema.py`](domains/airline-support/schema.py).
+
 ---
 
 ## Demo Paths
@@ -199,6 +217,7 @@ See:
 - [`domains/electrohub/docs/demo_paths.md`](domains/electrohub/docs/demo_paths.md)
 - [`domains/finance-researcher/docs/demo_paths.md`](domains/finance-researcher/docs/demo_paths.md)
 - [`domains/healthcare/docs/demo_paths.md`](domains/healthcare/docs/demo_paths.md)
+- [`domains/airline-support/docs/demo_paths.md`](domains/airline-support/docs/demo_paths.md)
 
 Reddash includes four scripted conversation flows:
 
@@ -215,6 +234,12 @@ ShiftIQ includes flagship paths for:
 2. **Metric-plus-document reasoning** — explain a quarter using both structured metrics and source documents
 3. **Peer trend analysis** — compare price and fundamentals trends, including RedisTimeSeries-backed queries
 4. **Live watchlist updates** — explain what changed this week using normalized coverage events and Redis Streams
+
+Airline support includes flagship paths for:
+
+1. **Disruption recovery** — explain a cancelled flight, the updated itinerary, and next steps
+2. **Post-rebooking serviceability** — answer check-in, baggage, and terminal questions against the reassigned trip
+3. **Traveller profile snapshot** — backup-only path for read-only identity and profile grounding
 
 ## Presentations
 
@@ -267,7 +292,8 @@ context-engine-demos/
 │   ├── reddash/             # Delivery-support reference domain
 │   ├── electrohub/          # Electronics retail reference domain
 │   ├── finance-researcher/  # ShiftIQ watchlist research domain
-│   └── healthcare/          # Patient success portal domain
+│   ├── healthcare/          # Patient success portal domain
+│   └── airline-support/     # Airline disruption and trip support domain
 │       ├── domain.py        # DOMAIN export implementing the contract
 │       ├── schema.py        # Entity definitions
 │       ├── prompt.py        # Domain prompt/playbooks
