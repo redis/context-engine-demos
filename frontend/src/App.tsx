@@ -135,7 +135,7 @@ type TimeSeriesChartPayload = {
 const modeStorageKey = "demo-domain-mode";
 
 function toolKindLabel(kind: ToolEvent["toolKind"]) {
-  if (kind === "mcp_tool") return "Context Surface";
+  if (kind === "mcp_tool") return "Context Retriever";
   if (kind === "cache") return "Semantic Cache";
   return "Internal";
 }
@@ -917,14 +917,14 @@ export default function App() {
               <BrandLogo src={domain?.logo_src} className="brand-logo" />
               <div className="brand-copy">
                 <div className="brand-name">{domain?.app_name ?? "Demo"}</div>
-                <div className="brand-subtitle">{domain?.subtitle ?? "Context Surfaces"}</div>
+                <div className="brand-subtitle">{domain?.subtitle ?? "Context Retriever"}</div>
               </div>
             </div>
           </div>
           <div className="topbar-controls">
             {domain?.demo_users && domain.demo_users.length > 0 && (
               <label className="demo-user-picker">
-                <span className="demo-user-label">Passenger</span>
+                <span className="demo-user-label">{domain?.demo_user_label ?? "User"}</span>
                 <span className="demo-user-select-shell">
                   <span className="demo-user-select-accent" aria-hidden="true" />
                   <select
@@ -945,7 +945,7 @@ export default function App() {
               </label>
             )}
             <div className="mode-toggle">
-              <button className={`mode-btn ${mode === "context_surfaces" ? "active" : ""}`} onClick={() => { setMode("context_surfaces"); resetConversation(); }} type="button">Context Surfaces</button>
+              <button className={`mode-btn ${mode === "context_surfaces" ? "active" : ""}`} onClick={() => { setMode("context_surfaces"); resetConversation(); }} type="button">Context Retriever</button>
               <button className={`mode-btn ${mode === "simple_rag" ? "active" : ""}`} onClick={() => { setMode("simple_rag"); resetConversation(); }} type="button">Simple RAG</button>
             </div>
           </div>
@@ -1096,7 +1096,7 @@ export default function App() {
                   </details>
                   <details className="platform-card">
                     <summary className="platform-card-summary">
-                      <span className="platform-card-title">Context Surface tools</span>
+                      <span className="platform-card-title">Context Retriever tools</span>
                       <span className="platform-card-summary-right">
                         <span className="platform-card-count">{health.mcp_tools.length}</span>
                       </span>
