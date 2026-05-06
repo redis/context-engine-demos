@@ -4,6 +4,10 @@ These scripted paths are the source of truth for the `airline-support` domain.
 Schema, prompt design, and generated data should all exist to support these
 conversations cleanly.
 
+For a live demo, prioritize Path 1 and Path 2. Path 3 is a backup only and
+should be used when the audience specifically wants to inspect identity
+grounding or read-only profile access.
+
 > Tip: Run each opening question once in Context Surfaces mode and then repeat
 > it in Simple RAG mode to show the difference between record-backed trip data
 > and generic policy guidance.
@@ -46,38 +50,49 @@ Simple RAG contrast:
 - Simple RAG can describe airline cancellations in general terms.
 - It cannot know the signed-in traveller's booking locator, cancelled flight number, rebooked replacement flight, or next-step record.
 
-## Path 2: Flight Status for the Next Confirmed Trip
+## Path 2: After the Rebooking: Check-In and Baggage
 
 Opening prompt:
-`Flight status`
+`Can I still check in for the new flight?`
 
-Follow-up:
-- `Which terminal should I go to?`
+Follow-ups:
+- `Will my baggage still go to New York?`
+- `Which terminal should I go to now?`
 
 Expected tool sequence:
 1. `get_current_user_profile`
 2. `filter_booking_by_customer_id`
-3. `get_current_time`
-4. `filter_itinerarysegment_by_booking_id`
-5. `filter_operatingflight_by_operating_flight_id`
+3. `filter_itinerarysegment_by_booking_id`
+4. `filter_operatingflight_by_operating_flight_id` using the updated itinerary segment's `operating_flight_id`
+5. `filter_reaccommodationrecord_by_booking_id` or `filter_reaccommodationrecord_by_customer_id`
+6. `search_travelpolicydoc_by_text(value="online check-in")`
+7. `search_travelpolicydoc_by_text(value="checked baggage")`
 
 Required supporting records:
 - `CustomerProfile`: `AIRCUST_001`
-- `Booking`: `BOOK_002` / locator `ZX19MP`
-- `ItinerarySegment`: `SEG_003` / `ZX018`
-- `OperatingFlight`: `OF_003`
+- `Booking`: `BOOK_001` / locator `ZX73QF`
+- `ItinerarySegment`: updated `SEG_002` / `ZX406`
+- `OperatingFlight`: `OF_002`
+- `ReaccommodationRecord`: `REAC_001`
+- `TravelPolicyDoc`: check-in, baggage, and post-rebooking guidance
 
 Expected assistant behavior:
-- Treat a generic `Flight status` question as a request about the traveller's next relevant unaffected trip.
-- Report the current status, route, scheduled timing, and terminal.
+- Confirm from records that the traveller has an active reassigned flight and identify the updated flight number, route, and departure timing.
+- Explain that check-in should follow the currently confirmed itinerary and that the traveller can keep using the same booking locator.
+- Use baggage policy as supplemental guidance: baggage should normally continue with the updated itinerary when the booking remains active.
+- Report the terminal from the updated operating flight record.
 - Only mention a gate if the segment record actually includes one; otherwise say it has not been assigned yet.
-- Avoid mixing this path with the disrupted booking unless the user explicitly pivots back.
+- Distinguish carefully between confirmed booking facts and generic baggage/check-in policy.
 
 Simple RAG contrast:
-- Simple RAG can describe how to check a flight status.
-- It cannot determine which flight is the traveller's next confirmed trip or cite the actual terminal and status from the booking records.
+- Simple RAG can summarize generic check-in and baggage guidance after a cancellation.
+- It cannot confirm that this traveller already has an active reassigned flight or apply that guidance to a specific updated itinerary.
 
-## Path 3: Traveller Profile Snapshot
+## Path 3: Backup Only - Traveller Profile Snapshot
+
+Use this only if the audience explicitly asks about identity grounding,
+profile-backed personalization, or privacy-safe account access. Do not use it
+as a primary scripted path in the live demo.
 
 Opening prompt:
 `What does my travel profile say about my status?`

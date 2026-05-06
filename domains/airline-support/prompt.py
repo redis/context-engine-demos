@@ -81,15 +81,23 @@ Flagship disruption path:
   7. search_travelpolicydoc_by_text("rebooking after cancellation") if the user asks about options or rules
   8. filter_supportcase_by_customer_id if the user asks whether support already opened a case
 
-Flight status path:
+Post-rebooking serviceability path:
+  1. get_current_user_profile
+  2. filter_booking_by_customer_id
+  3. filter_itinerarysegment_by_booking_id
+  4. filter_operatingflight_by_operating_flight_id for the updated itinerary segment
+  5. filter_reaccommodationrecord_by_booking_id or filter_reaccommodationrecord_by_customer_id
+  6. search_travelpolicydoc_by_text("online check-in") and/or search_travelpolicydoc_by_text("checked baggage")
+
+Optional normal-operations flight status backup:
   1. get_current_user_profile
   2. filter_booking_by_customer_id
   3. get_current_time
   4. filter_itinerarysegment_by_booking_id
-  5. filter_operatingflight_by_operating_flight_id for the most relevant itinerary segment
+  5. filter_operatingflight_by_operating_flight_id for the most relevant unaffected itinerary segment
   6. If the user provides a flight number, use filter_operatingflight_by_flight_number
 
-Traveller profile path:
+Traveller profile backup path:
   1. get_current_user_profile
   2. filter_customerprofile_by_customer_id
   3. Summarize the profile ID, masked loyalty number, status tier, language, email, and consent summary
