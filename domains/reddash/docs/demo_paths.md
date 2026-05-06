@@ -4,7 +4,7 @@ Four scripted conversation paths. Each starts with a natural question and
 chains follow-ups that showcase multi-entity reasoning, conversational memory,
 and the contrast with Simple RAG.
 
-> **Tip:** After running each path in Context Surfaces mode, toggle to
+> **Tip:** After running each path in Context Retriever mode, toggle to
 > Simple RAG and ask the same opening question to show the contrast.
 
 ---
@@ -62,4 +62,3 @@ and the contrast with Simple RAG.
 | 3 | **"Which order used a promo code?"** | Already has payment data in context | ORD_003: promo code WELCOME5, $5.00 discount on the Burger Barn order. |
 
 **RAG contrast:** Simple RAG has zero transactional data. It cannot answer any of these three questions.
-
