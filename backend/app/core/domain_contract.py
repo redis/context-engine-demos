@@ -46,6 +46,7 @@ class BrandingConfig(BaseModel):
     hero_title: str
     placeholder_text: str
     logo_path: str
+    demo_user_label: str = "User"
     starter_prompts: list[PromptCard]
     theme: ThemeConfig
     ui: UiConfig = Field(default_factory=UiConfig)

@@ -251,6 +251,7 @@ async def domain_config() -> JSONResponse:
         "subtitle": branding.subtitle,
         "hero_title": branding.hero_title,
         "placeholder_text": branding.placeholder_text,
+        "demo_user_label": branding.demo_user_label,
         "starter_prompts": [card.model_dump() for card in branding.starter_prompts],
         "theme": branding.theme.model_dump(),
         "ui": branding.ui.model_dump(),

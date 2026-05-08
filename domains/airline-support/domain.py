@@ -65,6 +65,7 @@ class AirlineSupportDomain:
             hero_title="Aurora Air",
             placeholder_text="Ask about your trip",
             logo_path="domains/airline-support/assets/logo.svg",
+            demo_user_label="Passenger",
             starter_prompts=[
                 PromptCard(
                     eyebrow="Flight Status",

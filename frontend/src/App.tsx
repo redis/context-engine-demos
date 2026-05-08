@@ -64,6 +64,7 @@ type DomainConfig = {
   subtitle: string;
   hero_title: string;
   placeholder_text: string;
+  demo_user_label?: string;
   starter_prompts: PromptCard[];
   theme: Record<string, string>;
   ui?: {
