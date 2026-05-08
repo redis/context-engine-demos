@@ -692,6 +692,7 @@ export default function App() {
   const [liveFeedTicker, setLiveFeedTicker] = useState<{ streamId: string; headline: string; timestamp: string } | null>(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [streamAnnouncement, setStreamAnnouncement] = useState("");
   const [threadId, setThreadId] = useState(() => crypto.randomUUID());
   const [selectedDemoUserId, setSelectedDemoUserId] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -815,6 +816,7 @@ export default function App() {
     setMessages([...nextMessages, assistantMsg]);
     setInput("");
     setIsLoading(true);
+    setStreamAnnouncement("Response in progress.");
 
     try {
       const response = await fetch("/api/chat/stream", {
@@ -827,6 +829,22 @@ export default function App() {
           demo_user_id: selectedDemoUserId || null,
         }),
       });
+
+      if (!response.ok) {
+        let errorMessage = `Request failed with status ${response.status}`;
+        try {
+          const payload = await response.json();
+          if (payload && typeof payload.detail === "string") errorMessage = payload.detail;
+        } catch {
+          // Keep the HTTP status fallback if the server does not return JSON.
+        }
+        setMessages((cur) =>
+          cur.map((m) => m.id === assistantId ? { ...m, content: errorMessage } : m),
+        );
+        setIsLoading(false);
+        setStreamAnnouncement(`Request failed: ${errorMessage}`);
+        return;
+      }
 
       if (!response.body) { setIsLoading(false); return; }
       const reader = response.body.getReader();
@@ -891,16 +909,22 @@ export default function App() {
           );
         }
       }
+      setStreamAnnouncement("Response complete.");
     } catch (err) {
       setMessages((cur) =>
         cur.map((m) => m.id === assistantId ? { ...m, content: m.content || "Connection error. Please try again." } : m),
       );
+      setStreamAnnouncement("Connection error. Please try again.");
     }
     setIsLoading(false);
   }
 
   async function handleSubmit(event?: FormEvent) { await submitPrompt(input, event); }
-  function handleQuickStart(prompt: string) { setInput(prompt); void submitPrompt(prompt); }
+  function handleQuickStart(prompt: string) {
+    if (isLoading) return;
+    setInput(prompt);
+    void submitPrompt(prompt);
+  }
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Enter" || event.shiftKey) return;
     event.preventDefault();
@@ -909,6 +933,7 @@ export default function App() {
 
   return (
     <div className="shell">
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{streamAnnouncement}</div>
       <main className="main">
         <header className="topbar">
           <div className="topbar-left">
@@ -921,13 +946,14 @@ export default function App() {
             </div>
           </div>
           <div className="topbar-controls">
-            {domain?.demo_users && domain.demo_users.length > 0 && (
+            {mode === "context_surfaces" && domain?.demo_users && domain.demo_users.length > 0 && (
               <label className="demo-user-picker">
                 <span className="demo-user-label">Passenger</span>
                 <span className="demo-user-select-shell">
                   <span className="demo-user-select-accent" aria-hidden="true" />
                   <select
                     value={selectedDemoUserId}
+                    disabled={isLoading}
                     onChange={(event) => {
                       setSelectedDemoUserId(event.target.value);
                       resetConversation();
@@ -944,8 +970,8 @@ export default function App() {
               </label>
             )}
             <div className="mode-toggle">
-              <button className={`mode-btn ${mode === "context_surfaces" ? "active" : ""}`} onClick={() => { setMode("context_surfaces"); resetConversation(); }} type="button">Context Surfaces</button>
-              <button className={`mode-btn ${mode === "simple_rag" ? "active" : ""}`} onClick={() => { setMode("simple_rag"); resetConversation(); }} type="button">Simple RAG</button>
+              <button disabled={isLoading} aria-pressed={mode === "context_surfaces"} className={`mode-btn ${mode === "context_surfaces" ? "active" : ""}`} onClick={() => { setMode("context_surfaces"); resetConversation(); }} type="button">Context Surfaces</button>
+              <button disabled={isLoading} aria-pressed={mode === "simple_rag"} className={`mode-btn ${mode === "simple_rag" ? "active" : ""}`} onClick={() => { setMode("simple_rag"); resetConversation(); }} type="button">Simple RAG</button>
             </div>
           </div>
         </header>
@@ -1194,9 +1220,11 @@ export default function App() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleComposerKeyDown}
               placeholder={domain?.placeholder_text ?? "Ask a question..."}
+              readOnly={isLoading}
+              aria-busy={isLoading}
             />
             <div className="composer-footer">
-              <div className="composer-hint">Press Enter to send</div>
+              <div className="composer-hint">{isLoading ? "Response in progress" : "Press Enter to send"}</div>
               <button className="send-button" type="submit" disabled={isLoading}>Send</button>
             </div>
           </form>
@@ -1206,7 +1234,7 @@ export default function App() {
               <div className="quick-starts-label">Try asking</div>
               <div className="quick-starts-row">
                 {(domain?.starter_prompts ?? []).map((p) => (
-                  <button key={p.title} className="quick-start-chip" onClick={() => handleQuickStart(p.prompt)} type="button">{p.title}</button>
+                  <button key={p.title} className="quick-start-chip" onClick={() => handleQuickStart(p.prompt)} type="button" disabled={isLoading}>{p.title}</button>
                 ))}
               </div>
             </div>

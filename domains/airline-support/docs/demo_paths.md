@@ -65,7 +65,7 @@ Suggested passenger order:
 3. `Jonas Klein` (`Frequent • EN`)
 
 Expected tool sequence:
-1. `get_current_user_profile`
+1. `get_current_service_tier_context`
 2. `search_travelpolicydoc_by_text(value="status tier disruption help")`
 
 Required supporting records:

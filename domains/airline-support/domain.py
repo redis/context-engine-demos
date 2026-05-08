@@ -47,6 +47,21 @@ DATASET_SUMMARY = _data_generator.DATASET_SUMMARY
 generate_demo_data = _data_generator.generate_demo_data
 build_system_prompt = _prompt.build_system_prompt
 ENTITY_SPECS = _schema.ENTITY_SPECS
+CACHE_SAFE_SERVICE_PERMISSION_FIELDS = (
+    "operational_alerts",
+    "self_service_rebooking",
+    "priority_service_routing",
+)
+
+
+def _cache_safe_service_permissions(profile: dict[str, Any]) -> dict[str, bool]:
+    permissions = profile.get("service_permissions")
+    if not isinstance(permissions, dict):
+        permissions = DEMO_PROFILE["service_permissions"]
+    return {
+        field: bool(permissions.get(field, False))
+        for field in CACHE_SAFE_SERVICE_PERMISSION_FIELDS
+    }
 
 
 class AirlineSupportDomain:
@@ -225,6 +240,8 @@ class AirlineSupportDomain:
 
         if tool_name == self.manifest.identity.tool_name:
             return "Identify the signed-in traveller before looking up bookings, operational disruptions, or profile details."
+        if tool_name == "get_current_service_tier_context":
+            return "Read the traveller's cache-safe tier and service-permission context for cohort-level benefit guidance."
         if tool_name == "get_current_time":
             return "Anchor the answer against the current UTC time before comparing trip dates or next steps."
         if tool_name == "dataset_overview":
@@ -259,6 +276,17 @@ class AirlineSupportDomain:
             InternalToolDefinition(
                 name=self.manifest.identity.tool_name,
                 description=self.manifest.identity.description,
+                access_control=InternalToolAccessControl(
+                    access_control_enabled=True,
+                    access_class_override="non-cacheable",
+                ),
+            ),
+            InternalToolDefinition(
+                name="get_current_service_tier_context",
+                description=(
+                    "Returns cache-safe cohort context for the signed-in traveller, including status tier, "
+                    "preferred language, service permissions, and cache group. Use this for tier-level benefit questions."
+                ),
                 access_control=InternalToolAccessControl(
                     access_control_enabled=True,
                     access_class_override="group",
@@ -306,6 +334,16 @@ class AirlineSupportDomain:
                     profile.get("enrollment_carrier", DEMO_PROFILE["enrollment_carrier"])
                 ),
                 "service_permissions": profile.get("service_permissions", DEMO_PROFILE["service_permissions"]),
+                "cache_group_id": str(profile.get("cache_group_id", DEMO_PROFILE["cache_group_id"])),
+            }
+        if tool_name == "get_current_service_tier_context":
+            request_context = get_request_context()
+            profile = request_context.demo_user or DEMO_PROFILE
+            return {
+                "status_tier": str(profile.get("status_tier", DEMO_PROFILE["status_tier"])),
+                "preferred_language": str(profile.get("preferred_language", DEMO_PROFILE["preferred_language"])),
+                "customer_program": str(profile.get("customer_program", DEMO_PROFILE["customer_program"])),
+                "service_permissions": _cache_safe_service_permissions(profile),
                 "cache_group_id": str(profile.get("cache_group_id", DEMO_PROFILE["cache_group_id"])),
             }
         if tool_name == "get_current_time":

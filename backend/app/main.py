@@ -5,7 +5,6 @@ import asyncio
 import base64
 import json
 import logging
-import sys
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
@@ -176,6 +175,63 @@ def _resolve_demo_user(request: ChatRequest) -> dict[str, Any] | None:
     return resolved
 
 
+def _effective_thread_id(request: ChatRequest, demo_user: dict[str, Any] | None) -> str:
+    raw_thread_id = request.thread_id or str(uuid4())
+    if demo_user:
+        identity = domain.manifest.identity
+        user_key = str(demo_user.get(identity.id_field) or request.demo_user_id or identity.default_id)
+    else:
+        user_key = "anonymous"
+    return f"{domain.manifest.id}:{user_key}:{raw_thread_id}"
+
+
+def _semantic_cache_lookup_block_reason(question: str) -> str | None:
+    normalized = question.lower()
+    user_specific_phrases = (
+        "my flight",
+        "my trip",
+        "my booking",
+        "my reservation",
+        "my itinerary",
+        "my support case",
+        "my case",
+        "my ticket",
+        "my profile",
+        "my email",
+        "on file",
+        "email do you have",
+        "customer id",
+        "record locator",
+        "booking reference",
+        "pnr",
+    )
+    if any(phrase in normalized for phrase in user_specific_phrases):
+        return "prompt requires live user-specific context"
+
+    account_terms = (
+        "account",
+        "booking",
+        "case",
+        "customer id",
+        "disrupted",
+        "email",
+        "itinerary",
+        "profile",
+        "reaccommodation",
+        "rebooked",
+        "record locator",
+        "reservation",
+        "support case",
+        "ticket",
+    )
+    personal_terms = (" my ", " me ", " i ", " i'm ", " i’m ")
+    padded = f" {normalized} "
+    if any(term in normalized for term in account_terms) and any(term in padded for term in personal_terms):
+        return "prompt requires live user-specific context"
+
+    return None
+
+
 def _cleanup_process_resources() -> None:
     global _background_resources_cleaned
     with _cleanup_lock:
@@ -184,34 +240,6 @@ def _cleanup_process_resources() -> None:
         _background_resources_cleaned = True
 
     semantic_cache_service.close()
-
-    try:
-        loky_reusable_executor = sys.modules.get("joblib.externals.loky.reusable_executor")
-        if loky_reusable_executor is not None:
-            executor = getattr(loky_reusable_executor, "_executor", None)
-            if executor is not None:
-                executor.shutdown(wait=True, kill_workers=True)
-                loky_reusable_executor._executor = None
-    except Exception:
-        log.exception("Unable to shut down loky reusable executor cleanly")
-
-    try:
-        loky_resource_tracker = sys.modules.get("joblib.externals.loky.backend.resource_tracker")
-        if loky_resource_tracker is not None:
-            tracker = getattr(loky_resource_tracker, "_resource_tracker", None)
-            if tracker is not None and getattr(tracker, "_fd", None) is not None:
-                tracker._stop()
-    except Exception:
-        log.exception("Unable to stop loky resource tracker cleanly")
-
-    try:
-        import multiprocessing.resource_tracker as multiprocessing_resource_tracker
-
-        tracker = multiprocessing_resource_tracker._resource_tracker
-        if tracker is not None and getattr(tracker, "_fd", None) is not None:
-            tracker._stop()
-    except Exception:
-        log.exception("Unable to stop multiprocessing resource tracker cleanly")
 
 
 atexit.register(_cleanup_process_resources)
@@ -274,9 +302,9 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
     agent = await get_agent()
     defer_final_answer = runtime_config.get("enable_post_model_verifier", False)
 
-    thread_id = request.thread_id or "default"
     latest_message = request.messages[-1].content if request.messages else ""
     demo_user = _resolve_demo_user(request)
+    thread_id = _effective_thread_id(request, demo_user)
     cache_group_id = ""
 
     config = {"configurable": {"thread_id": thread_id}}
@@ -287,10 +315,16 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
         cache_write_flags = {"public": False, "group": False, "non_cacheable": False}
         cache_provenance = {"public": set(), "group": set(), "non_cacheable": set()}
         cache_lookup_eligible = False
+        cache_reason = ""
         streamed_text: list[str] = []
 
         if semantic_cache_service.enabled:
-            cache_lookup_eligible = len(request.messages) == 1 and await semantic_cache_service.thread_is_fresh(agent, config)
+            cache_lookup_block_reason = _semantic_cache_lookup_block_reason(latest_message)
+            cache_lookup_eligible = (
+                len(request.messages) == 1
+                and cache_lookup_block_reason is None
+                and await semantic_cache_service.thread_is_fresh(agent, config)
+            )
             cache_request_payload = {
                 "question": latest_message,
                 "eligible": cache_lookup_eligible,
@@ -298,9 +332,10 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
             }
             cache_hit = None
             cache_outcome = "skip"
-            cache_reason = ""
             cache_duration_ms = 1
-            if not cache_lookup_eligible:
+            if cache_lookup_block_reason:
+                cache_reason = cache_lookup_block_reason
+            elif not cache_lookup_eligible:
                 cache_reason = "single-turn cache requires a fresh thread"
             else:
                 cache_request_payload["filterPolicy"] = semantic_cache_service.build_filter_policy(
@@ -474,6 +509,9 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                     output = json.loads(str(raw_output)) if raw_output else {}
                 except (json.JSONDecodeError, TypeError):
                     output = {"result": str(raw_output)}
+                if isinstance(output, dict) and output.get("error"):
+                    cache_write_flags["non_cacheable"] = True
+                    cache_provenance["non_cacheable"].add(f"{name}:error")
                 start = tool_start_times.pop(event["run_id"], perf_counter())
                 duration_ms = max(round((perf_counter() - start) * 1000), 1)
                 yield format_sse_event(
@@ -555,7 +593,7 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
         else:
             final_text = "".join(streamed_text).strip()
 
-        if semantic_cache_service.enabled and final_text and cache_lookup_eligible:
+        if semantic_cache_service.enabled and final_text:
             resolved_store_class, store_reason = semantic_cache_service.resolve_store_access(
                 saw_public=cache_write_flags["public"],
                 saw_group=cache_write_flags["group"],
@@ -566,10 +604,40 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                 "group": sorted(cache_provenance["group"]),
                 "nonCacheable": sorted(cache_provenance["non_cacheable"]),
             }
-            if resolved_store_class in {"public", "group"} and not (
+            if not cache_lookup_eligible:
+                write_run_id = f"cache-write-skip-{uuid4()}"
+                write_skip_reason = (
+                    store_reason
+                    if store_reason == "non-cacheable provenance"
+                    else cache_reason or "cache lookup was not eligible"
+                )
+                yield format_sse_event(
+                    "tool-call",
+                    toolName="Semantic cache write skip",
+                    toolKind="cache",
+                    runId=write_run_id,
+                    payload={
+                        "question": latest_message,
+                        "resolvedAccessClass": resolved_store_class,
+                        "cacheGroupId": cache_group_id if resolved_store_class == "group" else None,
+                        "provenanceSummary": provenance_summary,
+                    },
+                    ts=timer.elapsed_ms(),
+                )
+                yield format_sse_event(
+                    "tool-result",
+                    toolName="Semantic cache write skip",
+                    toolKind="cache",
+                    runId=write_run_id,
+                    payload={"result": "skip", "reason": write_skip_reason},
+                    durationMs=1,
+                    ts=timer.elapsed_ms(),
+                )
+            elif resolved_store_class in {"public", "group"} and not (
                 resolved_store_class == "group" and not cache_group_id
             ):
                 write_started = perf_counter()
+                write_skip_reason = ""
                 try:
                     stored = await semantic_cache_service.store(
                         prompt=latest_message,
@@ -585,11 +653,12 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                 except Exception:
                     log.exception("Semantic cache write failed")
                     stored = None
+                    write_skip_reason = "semantic cache write failed"
                 if stored:
                     write_request_payload = {
                         "question": latest_message,
                         "resolvedAccessClass": resolved_store_class,
-                        "cacheGroupId": cache_group_id or None,
+                        "cacheGroupId": cache_group_id if resolved_store_class == "group" else None,
                         "provenanceSummary": provenance_summary,
                     }
                     write_run_id = f"cache-write-{uuid4()}"
@@ -610,6 +679,58 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                         durationMs=max(round((perf_counter() - write_started) * 1000), 1),
                         ts=timer.elapsed_ms(),
                     )
+                else:
+                    write_run_id = f"cache-write-skip-{uuid4()}"
+                    yield format_sse_event(
+                        "tool-call",
+                        toolName="Semantic cache write skip",
+                        toolKind="cache",
+                        runId=write_run_id,
+                        payload={
+                            "question": latest_message,
+                            "resolvedAccessClass": resolved_store_class,
+                            "cacheGroupId": cache_group_id if resolved_store_class == "group" else None,
+                            "provenanceSummary": provenance_summary,
+                        },
+                        ts=timer.elapsed_ms(),
+                    )
+                    yield format_sse_event(
+                        "tool-result",
+                        toolName="Semantic cache write skip",
+                        toolKind="cache",
+                        runId=write_run_id,
+                        payload={"result": "skip", "reason": write_skip_reason or "cache entry was not stored"},
+                        durationMs=max(round((perf_counter() - write_started) * 1000), 1),
+                        ts=timer.elapsed_ms(),
+                    )
+            else:
+                if resolved_store_class == "group" and not cache_group_id:
+                    write_skip_reason = "group provenance without cache group"
+                else:
+                    write_skip_reason = store_reason
+                write_run_id = f"cache-write-skip-{uuid4()}"
+                yield format_sse_event(
+                    "tool-call",
+                    toolName="Semantic cache write skip",
+                    toolKind="cache",
+                    runId=write_run_id,
+                    payload={
+                        "question": latest_message,
+                        "resolvedAccessClass": resolved_store_class,
+                        "cacheGroupId": cache_group_id if resolved_store_class == "group" else None,
+                        "provenanceSummary": provenance_summary,
+                    },
+                    ts=timer.elapsed_ms(),
+                )
+                yield format_sse_event(
+                    "tool-result",
+                    toolName="Semantic cache write skip",
+                    toolKind="cache",
+                    runId=write_run_id,
+                    payload={"result": "skip", "reason": write_skip_reason},
+                    durationMs=1,
+                    ts=timer.elapsed_ms(),
+                )
 
         yield format_sse_event("done", totalElapsedMs=timer.elapsed_ms())
 
@@ -624,6 +745,8 @@ async def rag_event_stream(question: str) -> AsyncIterator[str]:
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest) -> StreamingResponse:
     question = request.messages[-1].content if request.messages else ""
+    if request.demo_user_id:
+        _resolve_demo_user(request)
 
     if request.mode == "simple_rag":
         return StreamingResponse(rag_event_stream(question), media_type="text/event-stream")

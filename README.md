@@ -21,6 +21,7 @@ The repo currently includes built-in demo domains for:
 
 - `reddash` — food-delivery support
 - `electrohub` — electronics retail and order support
+- `airline-support` — passenger support with semantic caching and cohort-scoped cache behavior
 - `finance-researcher` — ShiftIQ watchlist research across filings, metrics, prices, and live updates
 - `healthcare` — RedHealthConnect patient success portal (appointments, referrals, providers)
 
@@ -125,6 +126,9 @@ Open http://localhost:3040 and try:
 - In `electrohub`:
   - *"Show me my recent ElectroHub orders."*
   - *"Can I pick that up at my local store?"*
+- In `airline-support`:
+  - *"What help do I usually get after a cancellation?"*
+  - *"What is the status of ZX018 today?"*
 - In `finance-researcher` / ShiftIQ:
   - *"Walk me through Oracle's latest quarter using both the filing and the structured metrics."*
   - *"What's new in my watchlist this week?"*
@@ -196,6 +200,7 @@ See:
 
 - [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md)
 - [`domains/electrohub/docs/demo_paths.md`](domains/electrohub/docs/demo_paths.md)
+- [`domains/airline-support/docs/demo_paths.md`](domains/airline-support/docs/demo_paths.md)
 - [`domains/finance-researcher/docs/demo_paths.md`](domains/finance-researcher/docs/demo_paths.md)
 - [`domains/healthcare/docs/demo_paths.md`](domains/healthcare/docs/demo_paths.md)
 
@@ -207,6 +212,8 @@ Reddash includes four scripted conversation flows:
 4. **Multi-Entity Awareness** — cross-entity aggregation (restaurants, spend, promo codes)
 
 > **Tip:** After each path, toggle to Simple RAG mode and ask the same question to see the contrast.
+
+Airline Support includes scripted semantic-cache flows for public flight-status reuse, cohort-scoped passenger service guidance, and personalized disruption support that intentionally stays out of the cache.
 
 ShiftIQ includes flagship paths for:
 
@@ -265,6 +272,7 @@ context-engine-demos/
 ├── domains/
 │   ├── reddash/             # Delivery-support reference domain
 │   ├── electrohub/          # Electronics retail reference domain
+│   ├── airline-support/     # Passenger support + semantic cache reference domain
 │   ├── finance-researcher/  # ShiftIQ watchlist research domain
 │   └── healthcare/          # Patient success portal domain
 │       ├── domain.py        # DOMAIN export implementing the contract

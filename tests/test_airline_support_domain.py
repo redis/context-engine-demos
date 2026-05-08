@@ -18,7 +18,12 @@ def test_airline_support_domain_loads() -> None:
     ]
 
     tool_names = {tool.name for tool in domain.get_internal_tool_definitions(runtime_config={})}
-    assert tool_names == {"get_current_user_profile", "get_current_time", "dataset_overview"}
+    assert tool_names == {
+        "get_current_user_profile",
+        "get_current_service_tier_context",
+        "get_current_time",
+        "dataset_overview",
+    }
 
     prompt = domain.build_system_prompt(mcp_tools=[], runtime_config={})
     assert 'single **"value"** parameter' in prompt
@@ -36,6 +41,12 @@ def test_airline_support_domain_loads() -> None:
     assert identity["status_tier"] == "Senator"
     assert identity["cache_group_id"] == "senator_en"
     assert identity["service_permissions"]["operational_alerts"] is True
+
+    tier_context = domain.execute_internal_tool("get_current_service_tier_context", {}, settings=None)
+    assert tier_context["status_tier"] == "Senator"
+    assert tier_context["cache_group_id"] == "senator_en"
+    assert "customer_id" not in tier_context
+    assert "email" not in tier_context
 
 
 def test_airline_support_data_generator_writes_expected_files(tmp_path: Path) -> None:
