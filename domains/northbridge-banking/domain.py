@@ -49,9 +49,9 @@ class NorthbridgeBankingDomain(BankingSupportDomainBase):
         generated_models_path="domains/northbridge-banking/generated_models.py",
         output_dir="output/northbridge-banking",
         branding=BrandingConfig(
-            app_name="Redis x Northbridge Bank",
+            app_name="Northbridge Bank",
             subtitle="Banking support assistant",
-            hero_title="Redis x Northbridge Bank",
+            hero_title="Northbridge Bank",
             placeholder_text="Ask about your account, card, or support options",
             logo_path="domains/northbridge-banking/assets/logo.svg",
             demo_user_label="Customer",

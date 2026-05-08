@@ -9,7 +9,7 @@ from domains.banking_core.data_generator import build_demo_bundle, generate_demo
 CONFIG = BankingDemoConfig(
     domain_id="northbridge-banking",
     bank_name="Northbridge Bank",
-    app_name="Redis x Northbridge Bank",
+    app_name="Northbridge Bank",
     mobile_app_name="Northbridge app",
     redis_prefix="northbridge_banking",
     generated_models_module="domains.northbridge-banking.generated_models",

@@ -8,7 +8,7 @@ def test_northbridge_banking_domain_loads() -> None:
     domain = load_domain("northbridge-banking")
     assert domain.manifest.id == "northbridge-banking"
     assert Path(domain.manifest.branding.logo_path).exists()
-    assert domain.manifest.branding.app_name == "Redis x Northbridge Bank"
+    assert domain.manifest.branding.app_name == "Northbridge Bank"
     assert domain.manifest.branding.subtitle == "Banking support assistant"
     assert domain.manifest.branding.demo_user_label == "Customer"
     assert [card.title for card in domain.manifest.branding.starter_prompts] == [
