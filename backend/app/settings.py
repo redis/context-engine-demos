@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     show_final_verifier_trace_step: bool = Field(default=False)
     show_llm_trace_steps: bool = Field(default=False)
 
+    # Radish Bank input router (RedisVL SemanticRouter + sentence-transformers).
+    radish_hf_embedding_model: str = Field(
+        default="sentence-transformers/all-mpnet-base-v2",
+        description="Hugging Face model id for HFTextVectorizer.",
+    )
+    # Optional Hugging Face Hub token (env HF_TOKEN only): downloads, rate limits, gated models.
+    hf_token: str = Field(default="", validation_alias="HF_TOKEN")
+
 
 def get_settings() -> Settings:
     return Settings()

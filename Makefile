@@ -22,7 +22,7 @@ help:
 	@echo "  make cache-domain-price-csvs DOMAIN=<domain>  Run a domain-local price cache script when available"
 	@echo "    Optional: EXTRA_ENV_FILE=/path/to/shared.env"
 	@echo "  make flush-redis      Flush the Redis database (FLUSHDB)"
-	@echo "  make reset            Flush Redis + recreate surface + reload data"
+	@echo "  make reset [DOMAIN=...]  Flush Redis + recreate surface + reload data (DOMAIN defaults to reddash)"
 	@echo "  make backend          Start FastAPI backend"
 	@echo "  make frontend         Start Vite frontend"
 	@echo "  make dev              Run backend and frontend together"
