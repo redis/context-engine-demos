@@ -174,7 +174,7 @@ class AirlineSupportDomain:
         for profile in CUSTOMER_PROFILES:
             if profile["customer_id"] == demo_user_id:
                 return dict(profile)
-        return dict(DEMO_PROFILE)
+        return None
 
     def build_system_prompt(
         self,
@@ -197,6 +197,7 @@ class AirlineSupportDomain:
             return "non-cacheable"
         if (
             tool_name.startswith("filter_booking_by_")
+            or tool_name.startswith("search_booking_by_")
             or tool_name.startswith("filter_itinerarysegment_by_")
             or tool_name.startswith("filter_operationaldisruption_by_")
             or tool_name.startswith("filter_reaccommodationrecord_by_")

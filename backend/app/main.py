@@ -5,6 +5,7 @@ import asyncio
 import base64
 import json
 import logging
+import sys
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
@@ -12,6 +13,7 @@ from typing import Any, AsyncIterator
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage
@@ -168,7 +170,10 @@ def _resolve_demo_user(request: ChatRequest) -> dict[str, Any] | None:
     if not callable(resolver):
         return None
     selected_id = request.demo_user_id or domain.manifest.identity.default_id
-    return resolver(selected_id)
+    resolved = resolver(selected_id)
+    if resolved is None and request.demo_user_id:
+        raise HTTPException(status_code=400, detail=f"Unknown demo user: {request.demo_user_id}")
+    return resolved
 
 
 def _cleanup_process_resources() -> None:
@@ -181,21 +186,21 @@ def _cleanup_process_resources() -> None:
     semantic_cache_service.close()
 
     try:
-        from joblib.externals.loky import reusable_executor as loky_reusable_executor
-
-        executor = getattr(loky_reusable_executor, "_executor", None)
-        if executor is not None:
-            executor.shutdown(wait=True, kill_workers=True)
-            loky_reusable_executor._executor = None
+        loky_reusable_executor = sys.modules.get("joblib.externals.loky.reusable_executor")
+        if loky_reusable_executor is not None:
+            executor = getattr(loky_reusable_executor, "_executor", None)
+            if executor is not None:
+                executor.shutdown(wait=True, kill_workers=True)
+                loky_reusable_executor._executor = None
     except Exception:
         log.exception("Unable to shut down loky reusable executor cleanly")
 
     try:
-        from joblib.externals.loky.backend import resource_tracker as loky_resource_tracker
-
-        tracker = getattr(loky_resource_tracker, "_resource_tracker", None)
-        if tracker is not None and getattr(tracker, "_fd", None) is not None:
-            tracker._stop()
+        loky_resource_tracker = sys.modules.get("joblib.externals.loky.backend.resource_tracker")
+        if loky_resource_tracker is not None:
+            tracker = getattr(loky_resource_tracker, "_resource_tracker", None)
+            if tracker is not None and getattr(tracker, "_fd", None) is not None:
+                tracker._stop()
     except Exception:
         log.exception("Unable to stop loky resource tracker cleanly")
 
@@ -220,6 +225,7 @@ async def startup_resources() -> None:
 
 @app.on_event("shutdown")
 async def shutdown_resources() -> None:
+    await semantic_cache_service.aclose()
     _cleanup_process_resources()
     global _checkpointer
     if _checkpointer is not None and hasattr(_checkpointer, "aclose"):

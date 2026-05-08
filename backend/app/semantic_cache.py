@@ -15,6 +15,7 @@ from backend.app.settings import Settings
 log = logging.getLogger(__name__)
 
 StoreClass = Literal["public", "group", "non-cacheable", "ignored"]
+NO_GROUP_SENTINEL = "__none__"
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,10 @@ class SemanticCacheService:
             "allowPublic": True,
             "groupId": group_id or None,
         }
+
+    def normalize_group_id(self, group_id: Any) -> str:
+        raw = str(group_id or "")
+        return "" if raw == NO_GROUP_SENTINEL else raw
 
     def build_read_filter_expression(self, *, group_id: str | None) -> Any:
         domain_expr = (Tag("domain_id") == self.domain.manifest.id) & (Tag("mode") == "context_surfaces") & (
@@ -101,7 +106,7 @@ class SemanticCacheService:
             metadata=metadata if isinstance(metadata, dict) else {},
             filters={
                 "access_class": str(hit.get("access_class") or ""),
-                "group_id": str(hit.get("group_id") or ""),
+                "group_id": self.normalize_group_id(hit.get("group_id")),
                 "domain_id": str(hit.get("domain_id") or ""),
                 "mode": str(hit.get("mode") or ""),
                 "model_name": str(hit.get("model_name") or ""),
@@ -124,7 +129,7 @@ class SemanticCacheService:
             "mode": "context_surfaces",
             "model_name": self.settings.openai_chat_model,
             "access_class": access_class,
-            "group_id": group_id or "__none__",
+            "group_id": group_id or NO_GROUP_SENTINEL,
         }
         return await self._get_cache().astore(
             prompt=prompt,
@@ -169,7 +174,11 @@ class SemanticCacheService:
     def warmup(self, *, text: str = "semantic cache startup warmup") -> None:
         if not self.enabled:
             return
-        cache = self._get_cache()
+        try:
+            cache = self._get_cache()
+        except Exception:
+            log.exception("Unable to initialize semantic cache during warmup")
+            return
         vectorizer = getattr(cache, "_vectorizer", None)
         embed = getattr(vectorizer, "embed", None)
         if not callable(embed):
@@ -187,6 +196,24 @@ class SemanticCacheService:
             self._cache.disconnect()
         except Exception:
             log.exception("Unable to disconnect semantic cache cleanly")
+        vectorizer = getattr(self._cache, "_vectorizer", None)
+        client = getattr(vectorizer, "_client", None)
+        if client is not None:
+            try:
+                del client
+            except Exception:
+                log.exception("Unable to release semantic cache vectorizer client")
+        self._cache = None
+
+    async def aclose(self) -> None:
+        if self._cache is None:
+            return
+        try:
+            await self._cache.adisconnect()
+        except Exception:
+            log.exception("Unable to disconnect semantic cache async client cleanly")
+            self.close()
+            return
         vectorizer = getattr(self._cache, "_vectorizer", None)
         client = getattr(vectorizer, "_client", None)
         if client is not None:

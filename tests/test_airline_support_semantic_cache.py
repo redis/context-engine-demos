@@ -1,10 +1,15 @@
+import json
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
+from backend.app.core.domain_contract import InternalToolAccessControl
 from backend.app.core.domain_loader import load_domain
+from backend.app.contracts import ChatMessage, ChatRequest
+import backend.app.main as app_main
 from backend.app.request_context import request_context_scope
-from backend.app.semantic_cache import SemanticCacheService
+from backend.app.semantic_cache import NO_GROUP_SENTINEL, SemanticCacheHit, SemanticCacheService
 
 AIRLINE_SUPPORT_DOMAIN = load_domain("airline-support")
 
@@ -29,6 +34,17 @@ class FakeAgent:
         return config
 
 
+class FakeStreamingAgent(FakeAgent):
+    def __init__(self, events, messages=None):
+        super().__init__(messages=messages)
+        self._events = events
+
+    async def astream_events(self, payload, config, version):
+        del payload, config, version
+        for event in self._events:
+            yield event
+
+
 class FakeSettings:
     openai_chat_model = "gpt-4o"
     semantic_cache_embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
@@ -38,6 +54,66 @@ class FakeSettings:
     redis_password = ""
     redis_db = 0
     redis_ssl = False
+
+
+class FakeSemanticCacheRuntime:
+    def __init__(self, *, hit=None, persist_result=True, store_result="stored"):
+        self.enabled = True
+        self.hit = hit
+        self.persist_result = persist_result
+        self.store_result = store_result
+        self.persist_calls = []
+        self.store_calls = []
+        self.check_calls = []
+        self.filter_policy_calls = []
+
+    def build_filter_policy(self, *, group_id):
+        self.filter_policy_calls.append(group_id)
+        return {"allowPublic": True, "groupId": group_id or None}
+
+    async def thread_is_fresh(self, agent, config):
+        del agent, config
+        return True
+
+    async def check(self, *, prompt, group_id):
+        self.check_calls.append({"prompt": prompt, "group_id": group_id})
+        return self.hit
+
+    async def persist_cached_turn(self, *, agent, config, question, answer):
+        self.persist_calls.append((config, question, answer))
+        if not self.persist_result:
+            return False
+        return await agent.aupdate_state(config, {"messages": [question, answer]}) is not None
+
+    def resolve_store_access(self, *, saw_public, saw_group, saw_non_cacheable):
+        if saw_non_cacheable:
+            return None, "non-cacheable provenance"
+        if saw_group:
+            return "group", "group provenance"
+        if saw_public:
+            return "public", "public provenance"
+        return None, "no cacheable provenance"
+
+    async def store(self, *, prompt, response, access_class, group_id, metadata):
+        self.store_calls.append(
+            {
+                "prompt": prompt,
+                "response": response,
+                "access_class": access_class,
+                "group_id": group_id,
+                "metadata": metadata,
+            }
+        )
+        return self.store_result
+
+    def classify_mcp_tool(self, tool_name):
+        if tool_name.startswith("filter_booking_by_"):
+            return "non-cacheable"
+        return "public"
+
+
+def decode_sse(chunks: list[str]) -> list[dict[str, object]]:
+    return [json.loads(chunk.removeprefix("data: ").strip()) for chunk in chunks if chunk.startswith("data: ")]
 
 
 def test_airline_support_demo_users_include_shared_group() -> None:
@@ -59,12 +135,27 @@ def test_airline_support_identity_uses_request_scoped_demo_user() -> None:
     assert result["cache_group_id"] == "senator_en"
 
 
+def test_airline_support_unknown_demo_user_returns_none() -> None:
+    assert AIRLINE_SUPPORT_DOMAIN.resolve_demo_user("missing-user") is None
+
+
+def test_chat_request_rejects_unknown_demo_user(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(app_main, "domain", AIRLINE_SUPPORT_DOMAIN)
+    request = ChatRequest(
+        messages=[ChatMessage(role="user", content="What help do I get after a cancellation?")],
+        demo_user_id="missing-user",
+    )
+    with pytest.raises(HTTPException, match="Unknown demo user"):
+        app_main._resolve_demo_user(request)
+
+
 def test_semantic_cache_service_classifies_airline_tools() -> None:
     service = SemanticCacheService(FakeSettings(), AIRLINE_SUPPORT_DOMAIN)
     assert service.classify_mcp_tool("search_travelpolicydoc_by_text") == "public"
     assert service.classify_mcp_tool("filter_operatingflight_by_flight_number") == "public"
     assert service.classify_mcp_tool("filter_customerprofile_by_customer_id") == "non-cacheable"
     assert service.classify_mcp_tool("filter_booking_by_customer_id") == "non-cacheable"
+    assert service.classify_mcp_tool("search_booking_by_booking_locator") == "non-cacheable"
     assert service.classify_mcp_tool("some_unknown_tool") == "ignored"
 
 
@@ -113,6 +204,181 @@ def test_semantic_cache_service_filter_expression_scopes_reads() -> None:
     assert "@group_id:{senator_en}" in group_text
     assert "@access_class:{group}" in group_text
     assert "@access_class:{public}" in group_text
+
+
+def test_semantic_cache_service_normalizes_public_group_sentinel() -> None:
+    service = SemanticCacheService(FakeSettings(), AIRLINE_SUPPORT_DOMAIN)
+    assert service.normalize_group_id(NO_GROUP_SENTINEL) == ""
+    assert service.normalize_group_id("senator_en") == "senator_en"
+
+
+def test_semantic_cache_service_warmup_tolerates_cache_init_failure(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    service = SemanticCacheService(FakeSettings(), AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(service, "_get_cache", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    service.warmup()
+    assert "Unable to initialize semantic cache during warmup" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_cs_event_stream_short_circuits_on_cache_hit(monkeypatch: pytest.MonkeyPatch) -> None:
+    cached = SemanticCacheHit(
+        response="Cached cancellation guidance.",
+        metadata={},
+        filters={"access_class": "public", "group_id": "", "domain_id": "airline-support", "mode": "context_surfaces", "model_name": "gpt-4o"},
+    )
+    cache_runtime = FakeSemanticCacheRuntime(hit=cached)
+    agent = FakeAgent(messages=[])
+
+    async def fake_get_agent():
+        return agent
+
+    monkeypatch.setattr(app_main, "domain", AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(app_main, "semantic_cache_service", cache_runtime)
+    monkeypatch.setattr(app_main, "get_agent", fake_get_agent)
+
+    request = ChatRequest(messages=[ChatMessage(role="user", content="What help do I usually get after a cancellation?")])
+    chunks = [chunk async for chunk in app_main.cs_event_stream(request)]
+    events = decode_sse(chunks)
+
+    assert any(event["type"] == "tool-call" and event["toolName"] == "Semantic cache hit" for event in events)
+    hit_result = next(event for event in events if event["type"] == "tool-result" and event["toolName"] == "Semantic cache hit")
+    assert hit_result["payload"]["result"] == "hit"
+    assert hit_result["payload"]["groupId"] is None
+    assert any(event["type"] == "text-delta" and event["delta"] == "Cached cancellation guidance." for event in events)
+    assert cache_runtime.persist_calls
+
+
+@pytest.mark.asyncio
+async def test_cs_event_stream_uses_group_scope_for_cache_reads(monkeypatch: pytest.MonkeyPatch) -> None:
+    cached = SemanticCacheHit(
+        response="Group-scoped cancellation guidance.",
+        metadata={},
+        filters={"access_class": "group", "group_id": "senator_en", "domain_id": "airline-support", "mode": "context_surfaces", "model_name": "gpt-4o"},
+    )
+    cache_runtime = FakeSemanticCacheRuntime(hit=cached)
+    agent = FakeAgent(messages=[])
+
+    async def fake_get_agent():
+        return agent
+
+    monkeypatch.setattr(app_main, "domain", AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(app_main, "semantic_cache_service", cache_runtime)
+    monkeypatch.setattr(app_main, "get_agent", fake_get_agent)
+
+    request = ChatRequest(
+        messages=[ChatMessage(role="user", content="What help do I usually get after a cancellation?")],
+        demo_user_id="AIRCUST_001",
+    )
+    chunks = [chunk async for chunk in app_main.cs_event_stream(request)]
+    events = decode_sse(chunks)
+
+    assert cache_runtime.filter_policy_calls == ["senator_en"]
+    assert cache_runtime.check_calls == [{"prompt": "What help do I usually get after a cancellation?", "group_id": "senator_en"}]
+    hit_result = next(event for event in events if event["type"] == "tool-result" and event["toolName"] == "Semantic cache hit")
+    assert hit_result["payload"]["groupId"] == "senator_en"
+
+
+@pytest.mark.asyncio
+async def test_cs_event_stream_falls_back_when_cached_turn_cannot_persist(monkeypatch: pytest.MonkeyPatch) -> None:
+    cached = SemanticCacheHit(
+        response="Cached answer that should not be reused directly.",
+        metadata={},
+        filters={"access_class": "public", "group_id": "", "domain_id": "airline-support", "mode": "context_surfaces", "model_name": "gpt-4o"},
+    )
+    cache_runtime = FakeSemanticCacheRuntime(hit=cached, persist_result=False)
+    agent = FakeStreamingAgent(
+        [
+            {"event": "on_chat_model_stream", "run_id": "llm-1", "data": {"chunk": SimpleNamespace(content="Live fallback answer.", tool_calls=[])}},
+        ],
+        messages=[],
+    )
+
+    async def fake_get_agent():
+        return agent
+
+    monkeypatch.setattr(app_main, "domain", AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(app_main, "semantic_cache_service", cache_runtime)
+    monkeypatch.setattr(app_main, "get_agent", fake_get_agent)
+
+    request = ChatRequest(messages=[ChatMessage(role="user", content="What help do I usually get after a cancellation?")])
+    chunks = [chunk async for chunk in app_main.cs_event_stream(request)]
+    events = decode_sse(chunks)
+
+    skip_result = next(event for event in events if event["type"] == "tool-result" and event["toolName"] == "Semantic cache skip")
+    assert skip_result["payload"]["result"] == "skip"
+    assert skip_result["payload"]["reason"] == "cached turn could not be persisted into thread state"
+    assert any(event["type"] == "text-delta" and event["delta"] == "Live fallback answer." for event in events)
+
+
+@pytest.mark.asyncio
+async def test_cs_event_stream_writes_group_cache_for_identity_provenance(monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_runtime = FakeSemanticCacheRuntime(hit=None)
+    identity_tool = AIRLINE_SUPPORT_DOMAIN.manifest.identity.tool_name
+    events = [
+        {"event": "on_tool_start", "name": identity_tool, "run_id": "tool-1", "data": {"input": {}}},
+        {"event": "on_tool_end", "name": identity_tool, "run_id": "tool-1", "data": {"output": "{}"}},
+        {"event": "on_chat_model_stream", "run_id": "llm-1", "data": {"chunk": SimpleNamespace(content="Tier guidance.", tool_calls=[])}},
+    ]
+    agent = FakeStreamingAgent(events, messages=[])
+
+    async def fake_get_agent():
+        return agent
+
+    monkeypatch.setattr(app_main, "domain", AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(app_main, "semantic_cache_service", cache_runtime)
+    monkeypatch.setattr(app_main, "get_agent", fake_get_agent)
+    monkeypatch.setattr(app_main, "_tool_kind", lambda name: "internal_function" if name == identity_tool else "mcp_tool")
+    monkeypatch.setattr(
+        app_main,
+        "_internal_tool_access_control",
+        lambda name: InternalToolAccessControl(access_control_enabled=True, access_class_override="group")
+        if name == identity_tool
+        else InternalToolAccessControl(),
+    )
+
+    request = ChatRequest(
+        messages=[ChatMessage(role="user", content="What help do I usually get after a cancellation?")],
+        demo_user_id="AIRCUST_001",
+    )
+    chunks = [chunk async for chunk in app_main.cs_event_stream(request)]
+    decoded = decode_sse(chunks)
+
+    assert cache_runtime.store_calls
+    store_call = cache_runtime.store_calls[0]
+    assert store_call["access_class"] == "group"
+    assert store_call["group_id"] == "senator_en"
+    write_event = next(event for event in decoded if event["type"] == "tool-call" and event["toolName"] == "Semantic cache write")
+    assert write_event["payload"]["resolvedAccessClass"] == "group"
+    assert write_event["payload"]["cacheGroupId"] == "senator_en"
+
+
+@pytest.mark.asyncio
+async def test_cs_event_stream_skips_cache_write_for_non_cacheable_provenance(monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_runtime = FakeSemanticCacheRuntime(hit=None)
+    events = [
+        {"event": "on_tool_start", "name": "filter_booking_by_customer_id", "run_id": "tool-1", "data": {"input": {"customer_id": "AIRCUST_001"}}},
+        {"event": "on_tool_end", "name": "filter_booking_by_customer_id", "run_id": "tool-1", "data": {"output": "{}"}},
+        {"event": "on_chat_model_stream", "run_id": "llm-1", "data": {"chunk": SimpleNamespace(content="Your booking was disrupted.", tool_calls=[])}},
+    ]
+    agent = FakeStreamingAgent(events, messages=[])
+
+    async def fake_get_agent():
+        return agent
+
+    monkeypatch.setattr(app_main, "domain", AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(app_main, "semantic_cache_service", cache_runtime)
+    monkeypatch.setattr(app_main, "get_agent", fake_get_agent)
+    monkeypatch.setattr(app_main, "_tool_kind", lambda name: "mcp_tool")
+
+    request = ChatRequest(
+        messages=[ChatMessage(role="user", content="My flight was disrupted. What happened?")],
+        demo_user_id="AIRCUST_001",
+    )
+    chunks = [chunk async for chunk in app_main.cs_event_stream(request)]
+    decoded = decode_sse(chunks)
+
+    assert not cache_runtime.store_calls
+    assert not any(event["type"] == "tool-call" and event["toolName"] == "Semantic cache write" for event in decoded)
 
 
 @pytest.mark.parametrize(
