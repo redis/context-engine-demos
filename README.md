@@ -2,7 +2,7 @@
 
 # Context Engine Demos
 
-**Reusable demo apps powered by Redis Context Surfaces**
+**Reusable demo apps powered by Redis Context Retriever**
 
 Domain-specific demo apps for agentic workflows over structured Redis data,
 with full tool-call visibility in a dark-mode chat UI.
@@ -15,10 +15,11 @@ with full tool-call visibility in a dark-mode chat UI.
 
 ## What is this?
 
-Context Engine Demos is a multi-domain demo framework built around **Redis Context Surfaces**. The shared runtime shows how Context Surfaces turns Redis data into auto-generated [MCP](https://modelcontextprotocol.io/) tools that an AI agent can call. Instead of stuffing documents into a vector store and hoping the LLM figures it out, Context Surfaces gives agents **structured, scoped, real-time access** to operational data.
+Context Engine Demos is a multi-domain demo framework built around **Redis Context Retriever**. The shared runtime shows how Context Retriever turns Redis data into auto-generated [MCP](https://modelcontextprotocol.io/) tools that an AI agent can call. Instead of stuffing documents into a vector store and hoping the LLM figures it out, Context Retriever gives agents **structured, scoped, real-time access** to operational data.
 
 The repo currently includes built-in demo domains for:
 
+- `northbridge-banking` — public-safe consumer banking support with semantic caching
 - `reddash` — food-delivery support
 - `electrohub` — electronics retail and order support
 - `finance-researcher` — ShiftIQ watchlist research across filings, metrics, prices, and live updates
@@ -28,7 +29,7 @@ The repo currently includes built-in demo domains for:
 
 | Mode | How it works | Best for |
 |------|-------------|----------|
-| **Context Surfaces** | LangGraph ReAct agent with 60+ auto-generated MCP tools | Multi-entity reasoning, real-time data |
+| **Context Retriever** | LangGraph ReAct agent with 60+ auto-generated MCP tools | Multi-entity reasoning, real-time data |
 | **Simple RAG** | Vector search over policy docs → one-shot LLM answer | Showing the contrast |
 
 ---
@@ -46,7 +47,7 @@ You will also need:
 
 - **OpenAI API key** — for embeddings and chat completions
 - **Redis Cloud** instance — host, port, and password
-- **Context Surfaces admin key** (`CTX_ADMIN_KEY`) — from the Context Surfaces console
+- **Context Retriever admin key** (`CTX_ADMIN_KEY`) — from the Context Retriever console
 
 > The `context-surfaces` SDK ships with sensible defaults for API and MCP URLs. No extra URLs to configure.
 
@@ -74,6 +75,17 @@ CTX_ADMIN_KEY=your-admin-key
 
 Everything else is auto-populated by later steps or has sensible defaults. The active domain defaults to `reddash`; you can override it with `DEMO_DOMAIN=<domain-id>` or `make ... DOMAIN=<domain-id>`.
 
+To run the checked-in banking demo:
+
+```bash
+make validate-domain DOMAIN=northbridge-banking
+make generate-models DOMAIN=northbridge-banking
+make generate-data DOMAIN=northbridge-banking
+make setup-surface DOMAIN=northbridge-banking
+make load-data DOMAIN=northbridge-banking
+DEMO_DOMAIN=northbridge-banking make dev
+```
+
 ### 2. Install dependencies
 
 ```bash
@@ -90,13 +102,13 @@ make generate-models DOMAIN=reddash
 make generate-data DOMAIN=reddash
 ```
 
-### 4. Set up the Context Surface
+### 4. Set up the Context Retriever
 
 ```bash
 make setup-surface
 ```
 
-This creates a Context Surface with the active domain's generated models, embeds the current Redis connection settings as the surface data source, generates an agent key, and writes `CTX_SURFACE_ID` and `MCP_AGENT_KEY` back into `.env`.
+This creates a Context Retriever with the active domain's generated models, embeds the current Redis connection settings as the surface data source, generates an agent key, and writes `CTX_SURFACE_ID` and `MCP_AGENT_KEY` back into `.env`.
 
 ### 5. Load data
 
@@ -104,7 +116,7 @@ This creates a Context Surface with the active domain's generated models, embeds
 make load-data
 ```
 
-Pushes all records for the active domain through the Context Surfaces API, which handles Redis JSON storage and index creation.
+Pushes all records for the active domain through the Context Retriever API, which handles Redis JSON storage and index creation.
 
 ### 6. Run
 
@@ -138,7 +150,7 @@ Open http://localhost:3040 and try:
 
 ```
 ┌─────────────┐     SSE      ┌──────────────┐   JSON-RPC   ┌──────────────────┐
-│  React Chat │◄────────────►│   FastAPI     │◄────────────►│  Context Surfaces│
+│  React Chat │◄────────────►│   FastAPI     │◄────────────►│ Context Retriever│
 │  (Vite)     │              │ + LangGraph   │              │  MCP Server      │
 │  :3040      │              │   :8040       │              │  (cloud)         │
 └─────────────┘              └──────┬────────┘              └───────┬──────────┘
@@ -151,7 +163,7 @@ Open http://localhost:3040 and try:
                              └──────────────┘               └──────────────┘
 ```
 
-**Backend** — FastAPI app with a LangGraph ReAct agent. The shared runtime loads an active `DomainPack`, exposes domain UI config to the frontend, mounts domain-defined internal tools, and fetches MCP tools from Context Surfaces at startup. Conversations are persisted via a Redis-backed LangGraph checkpointer. Responses stream to the frontend over SSE.
+**Backend** — FastAPI app with a LangGraph ReAct agent. The shared runtime loads an active `DomainPack`, exposes domain UI config to the frontend, mounts domain-defined internal tools, and fetches MCP tools from Context Retriever at startup. Conversations are persisted via a Redis-backed LangGraph checkpointer. Responses stream to the frontend over SSE.
 
 **Frontend** — React + TypeScript + Vite. The UI shell is shared, while branding, starter prompts, placeholder text, and theme tokens are loaded from `/api/domain-config`. The chat view shows every tool call, payload, result, and duration.
 
@@ -194,10 +206,17 @@ Healthcare schema definitions live in [`domains/healthcare/schema.py`](domains/h
 
 See:
 
+- [`domains/northbridge-banking/docs/demo_paths.md`](domains/northbridge-banking/docs/demo_paths.md)
 - [`domains/reddash/docs/demo_paths.md`](domains/reddash/docs/demo_paths.md)
 - [`domains/electrohub/docs/demo_paths.md`](domains/electrohub/docs/demo_paths.md)
 - [`domains/finance-researcher/docs/demo_paths.md`](domains/finance-researcher/docs/demo_paths.md)
 - [`domains/healthcare/docs/demo_paths.md`](domains/healthcare/docs/demo_paths.md)
+
+Northbridge Bank includes three scripted conversation flows:
+
+1. **Shared product guidance** — public semantic-cache reuse for card controls
+2. **Segment-scoped support guidance** — cache partitioning within `Plus` / `Standard` cohorts
+3. **Flagship card decline recovery** — customer-specific reasoning across accounts, cards, authorisations, risk events, and recovery options
 
 Reddash includes four scripted conversation flows:
 
@@ -240,7 +259,7 @@ Example:
 | `make generate-models DOMAIN=reddash` | Regenerate ContextModel classes for the chosen domain |
 | `make generate-data DOMAIN=reddash` | Generate sample JSONL data in `output/<domain>` |
 | `make setup-surface DOMAIN=reddash` | Create surface + agent key using embedded Redis connection settings |
-| `make load-data DOMAIN=reddash` | Import JSONL data via Context Surfaces API |
+| `make load-data DOMAIN=reddash` | Import JSONL data via Context Retriever API |
 | `make smoke-domain DOMAIN=reddash` | Run a lightweight scaffold/data/model smoke test |
 | `make create-domain DOMAIN=electronics-store` | Scaffold a new domain pack |
 | `make backend` | Start FastAPI backend only |
@@ -263,6 +282,8 @@ context-engine-demos/
 │   ├── rag_service.py       # Shared simple-RAG comparison mode
 │   └── settings.py          # Pydantic settings (.env loader)
 ├── domains/
+│   ├── banking_core/        # Reusable consumer-banking core for branded variants
+│   ├── northbridge-banking/ # Public-safe banking demo domain
 │   ├── reddash/             # Delivery-support reference domain
 │   ├── electrohub/          # Electronics retail reference domain
 │   ├── finance-researcher/  # ShiftIQ watchlist research domain

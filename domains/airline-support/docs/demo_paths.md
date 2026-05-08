@@ -4,7 +4,7 @@ These scripted paths are the source of truth for the `airline-support` domain.
 Schema, prompt design, generated data, and semantic-cache behavior should all
 exist to support these conversations cleanly.
 
-> Tip: Use `Context Surfaces` for the main demo. For semantic-cache paths,
+> Tip: Use `Context Retriever` for the main demo. For semantic-cache paths,
 > repeat the exact same prompt on a fresh thread so the cache read behavior is
 > visible in the trace.
 

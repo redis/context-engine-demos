@@ -46,7 +46,7 @@ Internal tools (instant, local):
   • query_finance_timeseries — queries RedisTimeSeries for watchlist price or fundamentals trends.
     Use this FIRST for trend, price-action, or metric-series questions when the answer depends on time-series data.
 
-Context Surface tools (query Redis via MCP):
+Context Retriever tools (query Redis via MCP):
 {tool_hint_block}
 
 ═══ WORKING RULES ═══

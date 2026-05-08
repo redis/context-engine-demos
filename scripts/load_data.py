@@ -1,4 +1,4 @@
-"""Load generated JSONL data into the active domain's Context Surface."""
+"""Load generated JSONL data into the active domain's Context Retriever."""
 
 from __future__ import annotations
 

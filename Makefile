@@ -3,6 +3,7 @@ BACKEND_PORT ?= 8040
 FRONTEND_PORT ?= 3040
 DOMAIN ?= reddash
 EXTRA_ENV_FILE ?=
+FORCE_CREATE ?= 0
 
 .PHONY: help install backend-install frontend-install dev backend frontend \
 	generate-data generate-models load-data setup-surface validate-domain smoke-domain create-domain flush-redis reset \
@@ -13,7 +14,8 @@ help:
 	@echo "  make install          Install backend and frontend dependencies"
 	@echo "  make generate-models  Regenerate Context Surface model file for DOMAIN=$(DOMAIN)"
 	@echo "  make generate-data    Generate sample JSONL data into output/DOMAIN"
-	@echo "  make setup-surface    Create surface & agent key using embedded Redis connection settings"
+		@echo "  make setup-surface    Create surface & agent key using embedded Redis connection settings"
+		@echo "    Optional: FORCE_CREATE=1 to recreate the surface"
 	@echo "  make load-data        Load output/DOMAIN/*.jsonl into Redis + Search indexes"
 	@echo "  make validate-domain  Validate the active domain pack"
 	@echo "  make smoke-domain     Generate models/data and verify the domain structure"
@@ -45,7 +47,7 @@ load-data:
 	@uv run python scripts/load_data.py --domain $(DOMAIN)
 
 setup-surface:
-	@uv run python scripts/setup_surface.py --domain $(DOMAIN)
+	@uv run python scripts/setup_surface.py --domain $(DOMAIN) $(if $(filter 1 true yes,$(FORCE_CREATE)),--force-create,)
 
 validate-domain:
 	@uv run python scripts/validate_domain.py --domain $(DOMAIN)
@@ -101,7 +103,7 @@ reset: flush-redis
 	@echo "Clearing old surface credentials..."
 	@sed -i '' 's/^CTX_SURFACE_ID=.*/CTX_SURFACE_ID=/' .env
 	@sed -i '' 's/^MCP_AGENT_KEY=.*/MCP_AGENT_KEY=/' .env
-	@$(MAKE) setup-surface
+	@$(MAKE) setup-surface FORCE_CREATE=1
 	@$(MAKE) load-data
 	@echo ""
 	@echo "✅ Reset complete. Run 'make dev' to start."

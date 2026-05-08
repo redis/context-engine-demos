@@ -1,4 +1,4 @@
-"""Create or reuse the Context Surface for the active domain.
+"""Create or reuse the Context Retriever for the active domain.
 
 This script targets the current admin API contract, which expects
 embedded Redis connection settings under ``data_source.connection_config``
@@ -64,8 +64,23 @@ def _safe_response_text(response: httpx.Response) -> str:
         return response.text
 
 
+def _normalize_data_model_for_api(value: Any) -> Any:
+    if isinstance(value, dict):
+        normalized = {
+            key: _normalize_data_model_for_api(item)
+            for key, item in value.items()
+        }
+        if "distance_metric" in normalized and isinstance(normalized["distance_metric"], str):
+            normalized["distance_metric"] = normalized["distance_metric"].lower()
+        return normalized
+    if isinstance(value, list):
+        return [_normalize_data_model_for_api(item) for item in value]
+    return value
+
+
 def _parse_data_model(models_path: Path, *, surface_name: str) -> dict[str, Any]:
     data_model = _parse_data_model_from_python(models_path, surface_name, None, None)
+    data_model = _normalize_data_model_for_api(data_model)
     errors = validate_exported_data_model(data_model)
     if errors:
         joined = "\n".join(f"- {error}" for error in errors)
@@ -115,7 +130,7 @@ def _create_surface(
         )
     if response.status_code != 201:
         raise RuntimeError(
-            "Failed to create context surface "
+            "Failed to create Context Retriever "
             f"(status {response.status_code}): {_safe_response_text(response)}"
         )
     return response.json()
@@ -151,10 +166,65 @@ def _describe_surface(*, api_url: str, admin_key: str, surface_id: str) -> dict[
         )
     if response.status_code != 200:
         raise RuntimeError(
-            "Failed to describe context surface "
+            "Failed to describe Context Retriever "
             f"(status {response.status_code}): {_safe_response_text(response)}"
         )
     return response.json()
+
+
+def _expected_connection_config(*, settings: Any) -> dict[str, Any]:
+    return {
+        "addr": f"{settings.redis_host}:{settings.redis_port}",
+        "username": settings.redis_username or "default",
+        "password": settings.redis_password,
+        "db": settings.redis_db,
+        "tls_enabled": settings.redis_ssl,
+        "pool_size": 10,
+        "min_idle_conns": 2,
+    }
+
+
+def _extract_connection_config(surface_payload: dict[str, Any]) -> dict[str, Any] | None:
+    candidates = (
+        surface_payload.get("data_source", {}).get("connection_config"),
+        surface_payload.get("data_source", {}).get("connectionConfig"),
+        surface_payload.get("dataSource", {}).get("connection_config"),
+        surface_payload.get("dataSource", {}).get("connectionConfig"),
+    )
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            return candidate
+    return None
+
+
+def _extract_surface_data_model(surface_payload: dict[str, Any]) -> dict[str, Any] | None:
+    candidates = (
+        surface_payload.get("data_model"),
+        surface_payload.get("dataModel"),
+    )
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            return candidate
+    return None
+
+
+def _surface_connection_config_mismatch(*, surface_payload: dict[str, Any], settings: Any) -> bool:
+    embedded = _extract_connection_config(surface_payload)
+    if embedded is None:
+        return False
+    expected = _expected_connection_config(settings=settings)
+    for key, value in expected.items():
+        if embedded.get(key) != value:
+            return True
+    return False
+
+
+def _surface_data_model_mismatch(*, surface_payload: dict[str, Any], expected_data_model: dict[str, Any]) -> bool:
+    embedded = _extract_surface_data_model(surface_payload)
+    if embedded is None:
+        return False
+    normalized_embedded = _normalize_data_model_for_api(embedded)
+    return normalized_embedded != expected_data_model
 
 
 def _probe_redis_connection(
@@ -248,10 +318,33 @@ def main() -> None:
     surface_id = env.get("CTX_SURFACE_ID", "") if env_matches_target and not args.force_create else ""
     agent_key = env.get("MCP_AGENT_KEY", "") if env_matches_target and not args.force_create else ""
 
+    parsed_data_model: dict[str, Any] | None = None
+
     if surface_id:
-        print(f"Reusing context surface: {surface_id}")
+        print(f"Reusing Context Retriever: {surface_id}")
         try:
-            _describe_surface(api_url=api_url, admin_key=settings.ctx_admin_key, surface_id=surface_id)
+            parsed_data_model = _parse_data_model(generated_models_path, surface_name=surface_name)
+            surface_payload = _describe_surface(
+                api_url=api_url,
+                admin_key=settings.ctx_admin_key,
+                surface_id=surface_id,
+            )
+            if _surface_connection_config_mismatch(surface_payload=surface_payload, settings=settings):
+                print(
+                    "Existing Context Retriever uses a different embedded Redis connection config "
+                    "than the current .env settings."
+                )
+                print("Run again with --force-create to refresh the embedded Redis config.")
+                sys.exit(1)
+            if _surface_data_model_mismatch(
+                surface_payload=surface_payload,
+                expected_data_model=parsed_data_model,
+            ):
+                print(
+                    "Existing Context Retriever uses an older embedded data model than the current domain."
+                )
+                print("Run again with --force-create to refresh the embedded data model.")
+                sys.exit(1)
         except Exception as exc:
             print(f"Existing surface is not usable: {exc}")
             print("Run again with --force-create to create a fresh surface.")
@@ -259,8 +352,8 @@ def main() -> None:
     else:
         print("Validating Redis connection settings...")
         _preflight_redis_connection()
-        print("Creating context surface with embedded Redis data source...")
-        data_model = _parse_data_model(generated_models_path, surface_name=surface_name)
+        print("Creating Context Retriever with embedded Redis data source...")
+        data_model = parsed_data_model or _parse_data_model(generated_models_path, surface_name=surface_name)
         payload = _create_surface(
             api_url=api_url,
             admin_key=settings.ctx_admin_key,
@@ -294,7 +387,7 @@ def main() -> None:
     upsert_env_values(ENV_PATH, updates)
 
     print("")
-    print("Context surface ready.")
+    print("Context Retriever ready.")
     print(f"  Surface ID:        {surface_id}")
     print("  Redis source:      embedded connection_config")
     print("  Agent key saved to .env as MCP_AGENT_KEY")

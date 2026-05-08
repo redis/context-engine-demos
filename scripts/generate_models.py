@@ -14,15 +14,19 @@ from backend.app.core.domain_loader import load_domain
 from backend.app.core.domain_schema import FieldSpec
 
 
+def _py_string(value: str) -> str:
+    return repr(value)
+
+
 def render_field(field: FieldSpec) -> str:
     lines = [
         f"    {field.name}: {field.type_hint} = ContextField(",
-        f'        description="{field.description}",',
+        f"        description={_py_string(field.description)},",
     ]
     if field.is_key_component:
         lines.append("        is_key_component=True,")
     if field.index:
-        lines.append(f'        index="{field.index}",')
+        lines.append(f"        index={_py_string(field.index)},")
     if field.weight is not None:
         lines.append(f"        weight={field.weight},")
     if field.no_stem:
@@ -34,7 +38,7 @@ def render_field(field: FieldSpec) -> str:
     if field.vector_dim is not None:
         lines.append(f"        vector_dim={field.vector_dim},")
     if field.distance_metric is not None:
-        lines.append(f'        distance_metric="{field.distance_metric}",')
+        lines.append(f"        distance_metric={_py_string(field.distance_metric)},")
     lines.append("    )")
     return "\n".join(lines)
 
@@ -43,7 +47,7 @@ def render(domain_id: str) -> str:
     domain = load_domain(domain_id)
 
     chunks = [
-        f'"""Generated Context Surface models for the {domain.manifest.branding.app_name} domain."""',
+        f'"""Generated Context Retriever models for the {domain.manifest.branding.app_name} domain."""',
         "",
         "from __future__ import annotations",
         "",
@@ -56,7 +60,7 @@ def render(domain_id: str) -> str:
         chunks.append(f"class {entity.class_name}(ContextModel):")
         chunks.append(f'    """{entity.class_name} entity for the {domain.manifest.branding.app_name} domain."""')
         chunks.append("")
-        chunks.append(f'    __redis_key_template__ = "{entity.redis_key_template}"')
+        chunks.append(f"    __redis_key_template__ = {_py_string(entity.redis_key_template)}")
         chunks.append("")
         for field in entity.fields:
             chunks.append(render_field(field))
@@ -65,8 +69,8 @@ def render(domain_id: str) -> str:
             chunks.append(
                 "\n".join([
                     f"    {rel.name}: {rel.target_type} = ContextRelationship(",
-                    f'        description="{rel.description}",',
-                    f'        source_field="{rel.source_field}",',
+                    f"        description={_py_string(rel.description)},",
+                    f"        source_field={_py_string(rel.source_field)},",
                     "    )",
                 ])
             )

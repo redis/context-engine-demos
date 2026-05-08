@@ -78,7 +78,7 @@ Internal tools (instant, local):
     Call this whenever you need to compare against promised delivery dates, shipment scans, or pickup windows.
   • dataset_overview — returns counts of the current demo dataset.{analyzer_tool_block}
 
-Context Surface tools (query Redis via MCP):
+Context Retriever tools (query Redis via MCP):
 {tool_hint_block}
 
 ═══ CRITICAL RULES ═══

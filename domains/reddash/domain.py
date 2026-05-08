@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class ReddashDomain:
     manifest = DomainManifest(
         id="reddash",
-        description="Food-delivery support demo comparing Context Surfaces vs simple RAG.",
+        description="Food-delivery support demo comparing Context Retriever vs simple RAG.",
         generated_models_module="domains.reddash.generated_models",
         generated_models_path="domains/reddash/generated_models.py",
         output_dir="output/reddash",

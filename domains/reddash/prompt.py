@@ -35,7 +35,7 @@ Internal tools (instant, local):
     Call this whenever you need to compare against order timestamps.
   • dataset_overview — returns counts of entities in the current demo dataset.
 
-Context Surface tools (query Redis via MCP):
+Context Retriever tools (query Redis via MCP):
 {tool_hint_block}
 
 ═══ CRITICAL RULES ═══
@@ -77,4 +77,3 @@ Order items / missing item:
 • Reference real data: order IDs, driver names, timestamps, and dollar amounts.
 • When citing policy, quote the specific rule or threshold in plain English.
 """
-

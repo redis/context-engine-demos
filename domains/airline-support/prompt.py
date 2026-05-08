@@ -47,7 +47,7 @@ Internal tools (instant, local):
     Call this whenever timing matters for departure windows, disruptions, or next steps.
   • dataset_overview — returns counts for the current demo dataset.
 
-Context Surface tools (query Redis via MCP):
+Context Retriever tools (query Redis via MCP):
 {tool_hint_block}
 
 ═══ CRITICAL RULES ═══
