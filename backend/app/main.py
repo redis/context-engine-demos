@@ -228,9 +228,9 @@ async def shutdown_resources() -> None:
     await semantic_cache_service.aclose()
     _cleanup_process_resources()
     global _checkpointer
-    if _checkpointer is not None and hasattr(_checkpointer, "aclose"):
+    if _checkpointer is not None and hasattr(_checkpointer, "__aexit__"):
         try:
-            await _checkpointer.aclose()
+            await _checkpointer.__aexit__(None, None, None)
         except Exception:
             log.exception("Unable to close LangGraph checkpointer cleanly")
 
@@ -307,12 +307,20 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                     group_id=cache_group_id or None
                 )
                 cache_started = perf_counter()
-                cache_hit = await semantic_cache_service.check(
-                    prompt=latest_message,
-                    group_id=cache_group_id or None,
-                )
+                cache_outcome = "pending"
+                try:
+                    cache_hit = await semantic_cache_service.check(
+                        prompt=latest_message,
+                        group_id=cache_group_id or None,
+                    )
+                except Exception:
+                    log.exception("Semantic cache lookup failed")
+                    cache_hit = None
+                    cache_outcome = "skip"
+                    cache_reason = "semantic cache lookup failed"
                 cache_duration_ms = max(round((perf_counter() - cache_started) * 1000), 1)
-                cache_outcome = "hit" if cache_hit is not None else "miss"
+                if cache_outcome != "skip":
+                    cache_outcome = "hit" if cache_hit is not None else "miss"
 
             if cache_hit is not None and cache_outcome == "hit":
                 persisted = await semantic_cache_service.persist_cached_turn(
@@ -562,17 +570,21 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                 resolved_store_class == "group" and not cache_group_id
             ):
                 write_started = perf_counter()
-                stored = await semantic_cache_service.store(
-                    prompt=latest_message,
-                    response=final_text,
-                    access_class=resolved_store_class,
-                    group_id=cache_group_id if resolved_store_class == "group" else None,
-                    metadata={
-                        "resolved_access_class": resolved_store_class,
-                        "cache_group_id": cache_group_id if resolved_store_class == "group" else None,
-                        "provenance_summary": provenance_summary,
-                    },
-                )
+                try:
+                    stored = await semantic_cache_service.store(
+                        prompt=latest_message,
+                        response=final_text,
+                        access_class=resolved_store_class,
+                        group_id=cache_group_id if resolved_store_class == "group" else None,
+                        metadata={
+                            "resolved_access_class": resolved_store_class,
+                            "cache_group_id": cache_group_id if resolved_store_class == "group" else None,
+                            "provenance_summary": provenance_summary,
+                        },
+                    )
+                except Exception:
+                    log.exception("Semantic cache write failed")
+                    stored = None
                 if stored:
                     write_request_payload = {
                         "question": latest_message,

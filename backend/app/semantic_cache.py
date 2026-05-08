@@ -88,12 +88,16 @@ class SemanticCacheService:
         if not self.enabled:
             return None
         filter_expression = self.build_read_filter_expression(group_id=group_id)
-        hits = await self._get_cache().acheck(
-            prompt=prompt,
-            num_results=1,
-            return_fields=["response", "metadata", "access_class", "group_id", "domain_id", "mode", "model_name"],
-            filter_expression=filter_expression,
-        )
+        try:
+            hits = await self._get_cache().acheck(
+                prompt=prompt,
+                num_results=1,
+                return_fields=["response", "metadata", "access_class", "group_id", "domain_id", "mode", "model_name"],
+                filter_expression=filter_expression,
+            )
+        except Exception:
+            log.exception("Semantic cache check failed")
+            return None
         if not hits:
             return None
         hit = hits[0]
@@ -131,13 +135,17 @@ class SemanticCacheService:
             "access_class": access_class,
             "group_id": group_id or NO_GROUP_SENTINEL,
         }
-        return await self._get_cache().astore(
-            prompt=prompt,
-            response=response,
-            metadata=metadata,
-            filters=filters,
-            ttl=getattr(self.config, "ttl_seconds", None),
-        )
+        try:
+            return await self._get_cache().astore(
+                prompt=prompt,
+                response=response,
+                metadata=metadata,
+                filters=filters,
+                ttl=getattr(self.config, "ttl_seconds", None),
+            )
+        except Exception:
+            log.exception("Semantic cache store failed")
+            return None
 
     async def thread_is_fresh(self, agent: Any, config: dict[str, Any]) -> bool:
         if not hasattr(agent, "aget_state"):

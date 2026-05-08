@@ -57,15 +57,18 @@ class FakeSettings:
 
 
 class FakeSemanticCacheRuntime:
-    def __init__(self, *, hit=None, persist_result=True, store_result="stored"):
+    def __init__(self, *, hit=None, persist_result=True, store_result="stored", check_error=None, store_error=None):
         self.enabled = True
         self.hit = hit
         self.persist_result = persist_result
         self.store_result = store_result
+        self.check_error = check_error
+        self.store_error = store_error
         self.persist_calls = []
         self.store_calls = []
         self.check_calls = []
         self.filter_policy_calls = []
+        self.closed = False
 
     def build_filter_policy(self, *, group_id):
         self.filter_policy_calls.append(group_id)
@@ -77,6 +80,8 @@ class FakeSemanticCacheRuntime:
 
     async def check(self, *, prompt, group_id):
         self.check_calls.append({"prompt": prompt, "group_id": group_id})
+        if self.check_error is not None:
+            raise self.check_error
         return self.hit
 
     async def persist_cached_turn(self, *, agent, config, question, answer):
@@ -95,6 +100,8 @@ class FakeSemanticCacheRuntime:
         return None, "no cacheable provenance"
 
     async def store(self, *, prompt, response, access_class, group_id, metadata):
+        if self.store_error is not None:
+            raise self.store_error
         self.store_calls.append(
             {
                 "prompt": prompt,
@@ -110,6 +117,23 @@ class FakeSemanticCacheRuntime:
         if tool_name.startswith("filter_booking_by_"):
             return "non-cacheable"
         return "public"
+
+    async def aclose(self):
+        self.closed = True
+
+    def close(self):
+        self.closed = True
+
+
+class FakeCheckpointer:
+    def __init__(self):
+        self.exited = False
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        assert exc_type is None
+        assert exc_val is None
+        assert exc_tb is None
+        self.exited = True
 
 
 def decode_sse(chunks: list[str]) -> list[dict[str, object]]:
@@ -220,6 +244,31 @@ def test_semantic_cache_service_warmup_tolerates_cache_init_failure(monkeypatch:
 
 
 @pytest.mark.asyncio
+async def test_semantic_cache_service_check_tolerates_backend_failure(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    service = SemanticCacheService(FakeSettings(), AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(service, "_get_cache", lambda: (_ for _ in ()).throw(RuntimeError("cache unavailable")))
+
+    assert await service.check(prompt="What help do I get?", group_id="senator_en") is None
+    assert "Semantic cache check failed" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_semantic_cache_service_store_tolerates_backend_failure(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    service = SemanticCacheService(FakeSettings(), AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(service, "_get_cache", lambda: (_ for _ in ()).throw(RuntimeError("cache unavailable")))
+
+    stored = await service.store(
+        prompt="What help do I get?",
+        response="Tier guidance.",
+        access_class="group",
+        group_id="senator_en",
+        metadata={},
+    )
+    assert stored is None
+    assert "Semantic cache store failed" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_cs_event_stream_short_circuits_on_cache_hit(monkeypatch: pytest.MonkeyPatch) -> None:
     cached = SemanticCacheHit(
         response="Cached cancellation guidance.",
@@ -311,6 +360,33 @@ async def test_cs_event_stream_falls_back_when_cached_turn_cannot_persist(monkey
 
 
 @pytest.mark.asyncio
+async def test_cs_event_stream_falls_back_when_cache_lookup_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_runtime = FakeSemanticCacheRuntime(check_error=RuntimeError("cache unavailable"))
+    agent = FakeStreamingAgent(
+        [
+            {"event": "on_chat_model_stream", "run_id": "llm-1", "data": {"chunk": SimpleNamespace(content="Live answer after cache failure.", tool_calls=[])}},
+        ],
+        messages=[],
+    )
+
+    async def fake_get_agent():
+        return agent
+
+    monkeypatch.setattr(app_main, "domain", AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(app_main, "semantic_cache_service", cache_runtime)
+    monkeypatch.setattr(app_main, "get_agent", fake_get_agent)
+
+    request = ChatRequest(messages=[ChatMessage(role="user", content="What help do I usually get after a cancellation?")])
+    chunks = [chunk async for chunk in app_main.cs_event_stream(request)]
+    events = decode_sse(chunks)
+
+    skip_result = next(event for event in events if event["type"] == "tool-result" and event["toolName"] == "Semantic cache skip")
+    assert skip_result["payload"]["result"] == "skip"
+    assert skip_result["payload"]["reason"] == "semantic cache lookup failed"
+    assert any(event["type"] == "text-delta" and event["delta"] == "Live answer after cache failure." for event in events)
+
+
+@pytest.mark.asyncio
 async def test_cs_event_stream_writes_group_cache_for_identity_provenance(monkeypatch: pytest.MonkeyPatch) -> None:
     cache_runtime = FakeSemanticCacheRuntime(hit=None)
     identity_tool = AIRLINE_SUPPORT_DOMAIN.manifest.identity.tool_name
@@ -353,6 +429,45 @@ async def test_cs_event_stream_writes_group_cache_for_identity_provenance(monkey
 
 
 @pytest.mark.asyncio
+async def test_cs_event_stream_continues_when_cache_write_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_runtime = FakeSemanticCacheRuntime(hit=None, store_error=RuntimeError("cache unavailable"))
+    identity_tool = AIRLINE_SUPPORT_DOMAIN.manifest.identity.tool_name
+    agent = FakeStreamingAgent(
+        [
+            {"event": "on_tool_start", "name": identity_tool, "run_id": "tool-1", "data": {"input": {}}},
+            {"event": "on_tool_end", "name": identity_tool, "run_id": "tool-1", "data": {"output": "{}"}},
+            {"event": "on_chat_model_stream", "run_id": "llm-1", "data": {"chunk": SimpleNamespace(content="Tier guidance without cache write.", tool_calls=[])}},
+        ],
+        messages=[],
+    )
+
+    async def fake_get_agent():
+        return agent
+
+    monkeypatch.setattr(app_main, "domain", AIRLINE_SUPPORT_DOMAIN)
+    monkeypatch.setattr(app_main, "semantic_cache_service", cache_runtime)
+    monkeypatch.setattr(app_main, "get_agent", fake_get_agent)
+    monkeypatch.setattr(app_main, "_tool_kind", lambda name: "internal_function" if name == identity_tool else "mcp_tool")
+    monkeypatch.setattr(
+        app_main,
+        "_internal_tool_access_control",
+        lambda name: InternalToolAccessControl(access_control_enabled=True, access_class_override="group")
+        if name == identity_tool
+        else InternalToolAccessControl(),
+    )
+
+    request = ChatRequest(
+        messages=[ChatMessage(role="user", content="What help do I usually get after a cancellation?")],
+        demo_user_id="AIRCUST_001",
+    )
+    chunks = [chunk async for chunk in app_main.cs_event_stream(request)]
+    events = decode_sse(chunks)
+
+    assert any(event["type"] == "text-delta" and event["delta"] == "Tier guidance without cache write." for event in events)
+    assert not any(event["type"] == "tool-call" and event["toolName"] == "Semantic cache write" for event in events)
+
+
+@pytest.mark.asyncio
 async def test_cs_event_stream_skips_cache_write_for_non_cacheable_provenance(monkeypatch: pytest.MonkeyPatch) -> None:
     cache_runtime = FakeSemanticCacheRuntime(hit=None)
     events = [
@@ -379,6 +494,21 @@ async def test_cs_event_stream_skips_cache_write_for_non_cacheable_provenance(mo
 
     assert not cache_runtime.store_calls
     assert not any(event["type"] == "tool-call" and event["toolName"] == "Semantic cache write" for event in decoded)
+
+
+@pytest.mark.asyncio
+async def test_shutdown_resources_closes_async_checkpointer(monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_runtime = FakeSemanticCacheRuntime()
+    checkpointer = FakeCheckpointer()
+
+    monkeypatch.setattr(app_main, "semantic_cache_service", cache_runtime)
+    monkeypatch.setattr(app_main, "_cleanup_process_resources", lambda: None)
+    monkeypatch.setattr(app_main, "_checkpointer", checkpointer)
+
+    await app_main.shutdown_resources()
+
+    assert cache_runtime.closed is True
+    assert checkpointer.exited is True
 
 
 @pytest.mark.parametrize(
