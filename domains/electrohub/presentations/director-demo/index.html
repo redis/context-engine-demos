@@ -322,7 +322,7 @@
     <div class="reveal">
       <div class="slides">
         <section class="hero">
-          <div class="eyebrow">Redis Context Surfaces • ElectroHub</div>
+          <div class="eyebrow">Redis Context Retriever • ElectroHub</div>
           <div class="hero-grid">
             <div>
               <div class="brand-lockup">
@@ -331,11 +331,11 @@
               </div>
               <h1>ElectroHub<br />Agentic Commerce Demo</h1>
               <p class="quote">
-                How Redis Context Surfaces powers product search, store pickup,
+                How Redis Context Retriever powers product search, store pickup,
                 shipment support, and live operational answers in one commerce app.
               </p>
               <div class="pill-row">
-                <span class="pill redis">Redis Context Surfaces</span>
+                <span class="pill redis">Redis Context Retriever</span>
                 <span class="pill blue">LangGraph ReAct</span>
                 <span class="pill green">ElectroHub</span>
               </div>
@@ -383,7 +383,7 @@
               <ul class="flat">
                 <li>Document retrieval alone is not enough for inventory or shipment questions.</li>
                 <li>Hardcoded tool glue does not scale as the app adds more entities.</li>
-                <li>Context Surfaces gives the agent a structured operational interface over Redis.</li>
+                <li>Context Retriever gives the agent a structured operational interface over Redis.</li>
                 <li>That lets the model reason over live commerce state instead of only text snippets.</li>
               </ul>
             </div>
@@ -403,7 +403,7 @@
               <span class="arrow">→</span>
               <span class="node">ElectroHub Internal Tools</span>
               <span class="arrow">+</span>
-              <span class="node">Context Surfaces MCP Tools</span>
+              <span class="node">Context Retriever MCP Tools</span>
               <span class="arrow">→</span>
               <span class="node">Redis Data + Memory</span>
             </div>
@@ -428,7 +428,7 @@
               </ul>
             </div>
             <div class="card redis">
-              <h3>Redis / Context Surfaces</h3>
+              <h3>Redis / Context Retriever</h3>
               <ul class="flat">
                 <li>Live structured entities</li>
                 <li>MCP tool generation</li>
@@ -440,8 +440,8 @@
         </section>
 
         <section class="left">
-          <div class="eyebrow">Context Surfaces Model</div>
-          <h2>ElectroHub Ships A Real Context Surfaces Data Model</h2>
+          <div class="eyebrow">Context Retriever Model</div>
+          <h2>ElectroHub Ships A Real Context Retriever Data Model</h2>
           <div class="two-col">
             <div class="card">
               <pre><code class="language-python">from context_surfaces.context_model import (
@@ -493,9 +493,9 @@ class Product(ContextModel):
             <div class="card blue">
               <h3>Why this matters</h3>
               <ul class="flat">
-                <li>This is the Context Surfaces model the ElectroHub app actually registers.</li>
+                <li>This is the Context Retriever model the ElectroHub app actually registers.</li>
                 <li>Products, orders, shipments, support cases, and inventory each have explicit indexed fields.</li>
-                <li>Context Surfaces can turn that model into practical tools like <code>search_product_by_text</code> and <code>filter_storeinventory_by_product_id</code>.</li>
+                <li>Context Retriever can turn that model into practical tools like <code>search_product_by_text</code> and <code>filter_storeinventory_by_product_id</code>.</li>
               </ul>
             </div>
           </div>
@@ -548,7 +548,7 @@ client.post("/api/v1/context-surfaces", json=body)</code></pre>
 
         <section class="left">
           <div class="eyebrow">Tool Discovery</div>
-          <h2>The App Discovers And Calls Context Surfaces Tools At Runtime</h2>
+          <h2>The App Discovers And Calls Context Retriever Tools At Runtime</h2>
           <div class="two-col">
             <div class="card blue">
               <pre><code class="language-python">async def list_tools(self) -> list[dict[str, Any]]:
@@ -608,8 +608,8 @@ async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str
         </section>
 
         <section class="left">
-          <div class="eyebrow">Context Surfaces</div>
-          <h2>Where Redis Context Surfaces Changes The Game</h2>
+          <div class="eyebrow">Context Retriever</div>
+          <h2>Where Redis Context Retriever Changes The Game</h2>
           <div class="three-col">
             <div class="card redis">
               <h3>Without it</h3>
@@ -639,7 +639,7 @@ async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str
           <div class="card" style="margin-top: 18px;">
             <p class="callout">
               In ElectroHub, the same agent can reason over products, store inventory, shipments, and support cases
-              because Context Surfaces exposes all of those entities consistently as MCP tools.
+              because Context Retriever exposes all of those entities consistently as MCP tools.
             </p>
           </div>
         </section>
@@ -707,7 +707,7 @@ async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str
                   <td>“What is your pickup policy?”</td>
                 </tr>
                 <tr>
-                  <td>Agentic via Context Surfaces</td>
+                  <td>Agentic via Context Retriever</td>
                   <td>Operational answers across multiple live entities</td>
                   <td>More latency, more orchestration</td>
                   <td>“Can I pick that up at my local store?”</td>
@@ -794,7 +794,7 @@ agent = create_react_agent(
               <h3>For live demos</h3>
               <ul class="flat">
                 <li>Bring up Redis, surface, and app locally with a short setup flow.</li>
-                <li>Use the same UI to show both Simple RAG and agentic Context Surfaces behavior.</li>
+                <li>Use the same UI to show both Simple RAG and agentic Context Retriever behavior.</li>
                 <li>Keep the agent trace open so technical viewers can see planning and tool calls.</li>
               </ul>
             </div>
@@ -819,7 +819,7 @@ agent = create_react_agent(
               <h1>Key takeaways</h1>
               <div class="pill-row">
                 <span class="pill redis">Redis is the data plane</span>
-                <span class="pill blue">Context Surfaces is the structured tool plane</span>
+                <span class="pill blue">Context Retriever is the structured tool plane</span>
                 <span class="pill green">ElectroHub is the app experience</span>
               </div>
             </div>
@@ -827,7 +827,7 @@ agent = create_react_agent(
               <ul class="flat">
                 <li>This is not just semantic search over docs.</li>
                 <li>It is an agent operating over live commerce entities with visible reasoning and tool use.</li>
-                <li>Redis Context Surfaces is what makes that operational interface clean.</li>
+                <li>Redis Context Retriever is what makes that operational interface clean.</li>
               </ul>
             </div>
           </div>

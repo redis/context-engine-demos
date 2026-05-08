@@ -121,7 +121,7 @@ type TimeSeriesChartPayload = {
 const modeStorageKey = "demo-domain-mode";
 
 function toolKindLabel(kind: ToolEvent["toolKind"]) {
-  return kind === "mcp_tool" ? "Context Surface" : "Internal";
+  return kind === "mcp_tool" ? "Context Retriever" : "Internal";
 }
 
 function formatTotalElapsedMs(ms: number) {
@@ -898,12 +898,12 @@ export default function App() {
               <BrandLogo src={domain?.logo_src} className="brand-logo" />
               <div className="brand-copy">
                 <div className="brand-name">{domain?.app_name ?? "Demo"}</div>
-                <div className="brand-subtitle">{domain?.subtitle ?? "Context Surfaces"}</div>
+                <div className="brand-subtitle">{domain?.subtitle ?? "Context Retriever"}</div>
               </div>
             </div>
           </div>
           <div className="mode-toggle">
-            <button className={`mode-btn ${mode === "context_surfaces" ? "active" : ""}`} onClick={() => { setMode("context_surfaces"); setMessages([]); setThreadId(crypto.randomUUID()); }} type="button">Context Surfaces</button>
+            <button className={`mode-btn ${mode === "context_surfaces" ? "active" : ""}`} onClick={() => { setMode("context_surfaces"); setMessages([]); setThreadId(crypto.randomUUID()); }} type="button">Context Retriever</button>
             <button className={`mode-btn ${mode === "simple_rag" ? "active" : ""}`} onClick={() => { setMode("simple_rag"); setMessages([]); setThreadId(crypto.randomUUID()); }} type="button">Simple RAG</button>
           </div>
         </header>
@@ -1061,7 +1061,7 @@ export default function App() {
                   </details>
                   <details className="platform-card">
                     <summary className="platform-card-summary">
-                      <span className="platform-card-title">Context Surface tools</span>
+                      <span className="platform-card-title">Context Retriever tools</span>
                       <span className="platform-card-summary-right">
                         <span className="platform-card-count">{health.mcp_tools.length}</span>
                       </span>

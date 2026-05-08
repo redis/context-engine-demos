@@ -380,8 +380,8 @@ class FinanceResearcherDomain:
             ui=UiConfig(
                 show_platform_surface=True,
                 show_live_updates=True,
-                platform_surface_title="Context Surfaces, RedisTimeSeries, and Redis Streams in one demo",
-                platform_data_planes=["Context Surfaces", "RedisTimeSeries", "Redis Streams"],
+                platform_surface_title="Context Retriever, RedisTimeSeries, and Redis Streams in one demo",
+                platform_data_planes=["Context Retriever", "RedisTimeSeries", "Redis Streams"],
                 live_updates_title="Redis Stream feed for Finance Researcher",
             ),
         ),

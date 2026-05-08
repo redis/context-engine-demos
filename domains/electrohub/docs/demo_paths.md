@@ -3,7 +3,7 @@
 Three scripted paths for the ElectroHub electronics retail demo. Each one is
 designed to show the difference between structured tool use and generic RAG.
 
-> Tip: Run each opening question once in Context Surfaces mode and then repeat
+> Tip: Run each opening question once in Context Retriever mode and then repeat
 > it in Simple RAG mode to show how the tool-enabled system reaches live
 > product, store, and order data.
 
