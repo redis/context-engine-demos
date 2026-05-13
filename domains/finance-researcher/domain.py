@@ -20,7 +20,7 @@ from backend.app.core.domain_contract import (
     UiConfig,
 )
 from backend.app.core.domain_schema import EntitySpec
-from backend.app.domain_events import build_domain_event, publish_domain_event
+from backend.app.domain_events import build_domain_event, domain_event_stream_key, publish_domain_event
 from backend.app.redis_connection import create_redis_client
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -77,6 +77,8 @@ TIMESERIES_WINDOWS = {
     "max": None,
 }
 TIMESERIES_DEFAULT_LIMIT = 24
+RECENT_EVENT_DEFAULT_LIMIT = 5
+RECENT_EVENT_MAX_LIMIT = 12
 
 
 def _price_timeseries_key(*, redis_prefix: str, ticker: str, series_name: str) -> str:
@@ -191,6 +193,43 @@ def _timeseries_series_metadata(
         "unit": unit,
         "company_name": company["company_name"],
     }
+
+
+def _decode_stream_event(event_id: Any, fields: dict[str, Any]) -> dict[str, Any]:
+    event: dict[str, Any] = {}
+    for key, value in fields.items():
+        event[str(key)] = value
+
+    payload_raw = event.get("payload")
+    if isinstance(payload_raw, str) and payload_raw:
+        try:
+            event["payload"] = json.loads(payload_raw)
+        except json.JSONDecodeError:
+            event["payload"] = {"raw": payload_raw}
+    elif payload_raw is None:
+        event["payload"] = {}
+
+    company_id = event.get("company_id")
+    if isinstance(company_id, str) and company_id.startswith("company:"):
+        event["legacy_company_id"] = company_id
+        event["company_id"] = f"company_{company_id.split(':', 1)[1]}"
+
+    document_id = event.get("document_id")
+    if isinstance(document_id, str) and (document_id.startswith("research-doc:") or "-" in document_id):
+        event["legacy_document_id"] = document_id
+        event["document_id"] = ""
+
+    importance_raw = event.get("importance_score")
+    if importance_raw in (None, ""):
+        event["importance_score"] = None
+    else:
+        try:
+            event["importance_score"] = float(importance_raw)
+        except (TypeError, ValueError):
+            event["importance_score"] = importance_raw
+
+    event["stream_id"] = str(event_id)
+    return event
 
 
 def _write_finance_timeseries(*, client: Any, redis_prefix: str, records: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
@@ -471,6 +510,8 @@ class FinanceResearcherDomain:
             return "Inspect the current research dataset coverage before answering."
         if tool_name == "watchlist_overview":
             return "Review the analyst's 14-company watchlist and the current coverage state."
+        if tool_name == "recent_watchlist_events":
+            return "Read the latest Redis Stream coverage updates that power the live watchlist feed."
         if tool_name == "query_finance_timeseries":
             if detail:
                 return f"Query RedisTimeSeries for finance trend data: {detail}."
@@ -504,6 +545,24 @@ class FinanceResearcherDomain:
             InternalToolDefinition(
                 name="watchlist_overview",
                 description="Returns the 14-company analyst watchlist and the latest known coverage state for each company.",
+            ),
+            InternalToolDefinition(
+                name="recent_watchlist_events",
+                description=(
+                    "Reads the newest live finance-researcher coverage updates directly from the Redis Stream that "
+                    "powers the UI live feed."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of latest stream events to return.",
+                            "default": RECENT_EVENT_DEFAULT_LIMIT,
+                        },
+                    },
+                    "required": [],
+                },
             ),
             InternalToolDefinition(
                 name="query_finance_timeseries",
@@ -572,6 +631,35 @@ class FinanceResearcherDomain:
             return {
                 "watchlist_size": len(WATCHLIST),
                 "watchlist": [{"ticker": ticker, "company_name": company_name} for ticker, company_name in WATCHLIST],
+            }
+        if tool_name == "recent_watchlist_events":
+            try:
+                requested_limit = int(arguments.get("limit") or RECENT_EVENT_DEFAULT_LIMIT)
+            except (TypeError, ValueError):
+                requested_limit = RECENT_EVENT_DEFAULT_LIMIT
+            limit = max(1, min(requested_limit, RECENT_EVENT_MAX_LIMIT))
+            stream_key = domain_event_stream_key(self)
+            client = create_redis_client(settings)
+            try:
+                raw_events = client.xrevrange(stream_key, max="+", min="-", count=limit)
+            except Exception as exc:
+                return {
+                    "error": "Redis Stream query failed.",
+                    "stream_key": stream_key,
+                    "detail": str(exc),
+                }
+            finally:
+                close = getattr(client, "close", None)
+                if callable(close):
+                    close()
+
+            events = [_decode_stream_event(event_id, fields) for event_id, fields in raw_events or []]
+            return {
+                "stream_key": stream_key,
+                "redis_command": f"XREVRANGE {stream_key} + - COUNT {limit}",
+                "events_order": "newest_first",
+                "event_count": len(events),
+                "events": events,
             }
         if tool_name == "query_finance_timeseries":
             tickers = _parse_tickers(str(arguments.get("tickers") or ""))

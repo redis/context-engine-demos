@@ -1,5 +1,6 @@
 from pathlib import Path
 from hashlib import sha256
+import json
 
 from backend.app.core.domain_loader import load_domain
 
@@ -29,6 +30,8 @@ def test_finance_researcher_domain_loads_and_generates_data(tmp_path: Path) -> N
     assert domain.manifest.branding.ui.show_platform_surface is True
     assert domain.manifest.branding.ui.show_live_updates is True
     assert len(domain.get_entity_specs()) == 7
+    tool_names = {tool.name for tool in domain.get_internal_tool_definitions(runtime_config={})}
+    assert "recent_watchlist_events" in tool_names
 
     shared_raw_dir = Path(__file__).resolve().parents[1] / "output" / "finance-researcher" / "raw"
     shared_raw_snapshot = snapshot_tree(shared_raw_dir)
@@ -40,6 +43,13 @@ def test_finance_researcher_domain_loads_and_generates_data(tmp_path: Path) -> N
 
     for spec in domain.get_entity_specs():
         assert (tmp_path / spec.file_name).exists()
+
+    for file_name in ("research_documents.jsonl", "research_chunks.jsonl", "coverage_events.jsonl"):
+        for line in (tmp_path / file_name).read_text().splitlines():
+            row = json.loads(line)
+            document_id = row.get("document_id")
+            if document_id:
+                assert "-" not in document_id
 
     raw_dir = tmp_path / "raw"
     assert raw_dir.exists()

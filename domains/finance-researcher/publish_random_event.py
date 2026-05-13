@@ -38,12 +38,38 @@ def _load_watchlist(domain_id: str) -> list[dict[str, Any]]:
     return watchlist
 
 
-def _build_random_event(company: dict[str, Any], rng: random.Random) -> dict[str, Any]:
+def _load_latest_document_ids(domain_id: str) -> dict[str, str]:
+    document_path = ROOT / "output" / domain_id / "research_documents.jsonl"
+    if not document_path.exists():
+        return {}
+
+    latest_by_ticker: dict[str, tuple[str, str]] = {}
+    for line in document_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        ticker = str(row.get("ticker", "")).upper()
+        document_id = str(row.get("document_id", ""))
+        published_at = str(row.get("published_at", ""))
+        if not ticker or not document_id:
+            continue
+        current = latest_by_ticker.get(ticker)
+        if current is None or published_at > current[0]:
+            latest_by_ticker[ticker] = (published_at, document_id)
+
+    return {ticker: document_id for ticker, (_published_at, document_id) in latest_by_ticker.items()}
+
+
+def _build_random_event(
+    company: dict[str, Any],
+    rng: random.Random,
+    latest_document_ids: dict[str, str],
+) -> dict[str, Any]:
     ticker = company["ticker"]
     company_name = company["company_name"]
     sector = company.get("sector", "Technology")
     benchmark_group = company.get("benchmark_group", "watchlist peers")
-    company_id = f"company:{ticker.lower()}"
+    company_id = f"company_{ticker.lower()}"
 
     event_templates = [
         {
@@ -107,8 +133,7 @@ def _build_random_event(company: dict[str, Any], rng: random.Random) -> dict[str
     ]
 
     template = rng.choice(event_templates)
-    doc_slug = template["event_type"].replace("_", "-")
-    document_id = f"research-doc:{ticker.lower()}-{doc_slug}"
+    document_id = latest_document_ids.get(ticker, "") if template["event_type"] == "sec-filing" else ""
 
     return build_domain_event(
         event_family="coverage",
@@ -164,10 +189,11 @@ def main() -> None:
     settings = get_settings()
     domain = load_domain(args.domain)
     watchlist = _load_watchlist(args.domain)
+    latest_document_ids = _load_latest_document_ids(args.domain)
     rng = random.Random(args.seed)
 
     company = rng.choice(watchlist)
-    event = _build_random_event(company, rng)
+    event = _build_random_event(company, rng, latest_document_ids)
     stream_id = domain.publish_coverage_event(
         settings=settings,
         company_id=event["company_id"],

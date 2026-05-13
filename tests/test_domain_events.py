@@ -2,6 +2,7 @@ import pytest
 
 from backend.app.core.domain_loader import load_domain
 from backend.app.domain_events import (
+    DOMAIN_EVENT_BLOCK_MS,
     _decode_domain_event,
     _redis_stream_id_is_older_or_equal,
     build_domain_event,
@@ -115,7 +116,7 @@ async def test_stream_domain_events_advances_cursor_past_replayed_history(monkey
 
         async def xread(self, streams: dict[str, str], *, block: int, count: int):
             self.xread_calls.append(streams)
-            assert block == 15000
+            assert block == DOMAIN_EVENT_BLOCK_MS
             assert count == 50
             if len(self.xread_calls) == 1:
                 return [

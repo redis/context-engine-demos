@@ -3,6 +3,7 @@ BACKEND_PORT ?= 8040
 FRONTEND_PORT ?= 3040
 DOMAIN ?= reddash
 EXTRA_ENV_FILE ?=
+LOAD_DATA_ARGS ?=
 
 .PHONY: help install backend-install frontend-install dev backend frontend \
 	generate-data generate-models load-data setup-surface validate-domain smoke-domain create-domain flush-redis reset \
@@ -42,7 +43,7 @@ generate-data:
 	@uv run python scripts/generate_data.py --domain $(DOMAIN)
 
 load-data:
-	@uv run python scripts/load_data.py --domain $(DOMAIN)
+	@uv run python scripts/load_data.py --domain $(DOMAIN) $(LOAD_DATA_ARGS)
 
 setup-surface:
 	@uv run python scripts/setup_surface.py --domain $(DOMAIN)
@@ -81,7 +82,7 @@ cache-domain-price-csvs:
 	uv run python domains/$(DOMAIN)/fetch_price_csvs.py --years 5
 
 backend:
-	@uv run uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)
+	@DEMO_DOMAIN=$(DOMAIN) uv run uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)
 
 frontend:
 	@cd frontend && npm run dev -- --host 0.0.0.0 --port $(FRONTEND_PORT)

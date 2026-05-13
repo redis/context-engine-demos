@@ -5,11 +5,14 @@ from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from typing import Any
 
+from redis.exceptions import TimeoutError as RedisTimeoutError
+
 from backend.app.core.domain_contract import DomainPack
 from backend.app.redis_connection import create_async_redis_client, create_redis_client
 from backend.app.settings import Settings
 
 DOMAIN_EVENT_STREAM_SUFFIX = "stream:events"
+DOMAIN_EVENT_BLOCK_MS = 5000
 
 
 def domain_event_stream_key(domain: DomainPack) -> str:
@@ -159,7 +162,11 @@ async def stream_domain_events(
                     last_id = newest_history_id
 
         while True:
-            messages = await client.xread({stream_key: last_id}, block=15000, count=50)
+            try:
+                messages = await client.xread({stream_key: last_id}, block=DOMAIN_EVENT_BLOCK_MS, count=50)
+            except RedisTimeoutError:
+                yield ": keepalive\n\n"
+                continue
             if not messages:
                 yield ": keepalive\n\n"
                 continue
