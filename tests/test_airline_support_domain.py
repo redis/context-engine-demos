@@ -28,7 +28,9 @@ def test_airline_support_domain_loads() -> None:
     prompt = domain.build_system_prompt(mcp_tools=[], runtime_config={})
     assert 'single **"value"** parameter' in prompt
     assert "Flagship disruption path" in prompt
-    assert "Traveller profile path" in prompt
+    assert "Post-rebooking serviceability path" in prompt
+    assert "Shared flight-number status path" in prompt
+    assert "Traveller profile backup path" in prompt
     assert "Tier-aware self-service path" in prompt
     assert "get_current_user_profile first" in prompt.lower()
     rag_prompt = domain.manifest.rag.answer_system_prompt

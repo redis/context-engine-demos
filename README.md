@@ -5,7 +5,7 @@
 **Reusable demo apps powered by Redis Context Surfaces**
 
 Domain-specific demo apps for agentic workflows over structured Redis data,
-with full tool-call visibility in a dark-mode chat UI.
+with full tool-call visibility in a themed chat UI.
 
 [Getting Started](#getting-started) · [Architecture](#architecture) · [Demo Paths](#demo-paths)
 
@@ -21,7 +21,7 @@ The repo currently includes built-in demo domains for:
 
 - `reddash` — food-delivery support
 - `electrohub` — electronics retail and order support
-- `airline-support` — passenger support with semantic caching and cohort-scoped cache behavior
+- `airline-support` — passenger support across disruptions, reassignment, traveller profile lookup, and scoped semantic caching
 - `finance-researcher` — ShiftIQ watchlist research across filings, metrics, prices, and live updates
 - `healthcare` — RedHealthConnect patient success portal (appointments, referrals, providers)
 
@@ -127,6 +127,8 @@ Open http://localhost:3040 and try:
   - *"Show me my recent ElectroHub orders."*
   - *"Can I pick that up at my local store?"*
 - In `airline-support`:
+  - *"My flight was disrupted. What happened?"*
+  - *"Can I still check in for the new flight?"*
   - *"What help do I usually get after a cancellation?"*
   - *"What is the status of ZX018 today?"*
 - In `finance-researcher` / ShiftIQ:
@@ -192,6 +194,20 @@ The `healthcare` domain models a patient success portal with six entity types:
 
 Healthcare schema definitions live in [`domains/healthcare/schema.py`](domains/healthcare/schema.py).
 
+The `airline-support` domain models a synthetic airline support workflow with seven entity types:
+
+| Entity | Key Pattern | Key Indexed Fields |
+|--------|-------------|-------------------|
+| **CustomerProfile** | `airline_support_customer_profile:{customer_id}` | travel_id, masked_loyalty_number, loyalty_tier |
+| **Booking** | `airline_support_booking:{booking_id}` | customer_id, booking_locator, trip_status |
+| **ItinerarySegment** | `airline_support_itinerary_segment:{segment_id}` | booking_id, operating_flight_id, flight_number |
+| **OperatingFlight** | `airline_support_operating_flight:{operating_flight_id}` | flight_number, service_date, operating_status |
+| **OperationalDisruption** | `airline_support_operational_disruption:{operational_disruption_id}` | operating_flight_id, disruption_type, disruption_reason_code |
+| **ReaccommodationRecord** | `airline_support_reaccommodation_record:{reaccommodation_record_id}` | customer_id, booking_id, reaccommodation_status |
+| **TravelPolicyDoc** | `airline_support_travel_policy_doc:{doc_id}` | title, category, content, content_embedding (vector) |
+
+Airline support schema definitions live in [`domains/airline-support/schema.py`](domains/airline-support/schema.py).
+
 ---
 
 ## Demo Paths
@@ -213,7 +229,12 @@ Reddash includes four scripted conversation flows:
 
 > **Tip:** After each path, toggle to Simple RAG mode and ask the same question to see the contrast.
 
-Airline Support includes scripted semantic-cache flows for public flight-status reuse, cohort-scoped passenger service guidance, and personalized disruption support that intentionally stays out of the cache.
+Airline support includes flagship and semantic-cache paths for:
+
+1. **Disruption recovery** — explain a cancelled flight, the updated itinerary, and next steps
+2. **Post-rebooking serviceability** — answer check-in, baggage, and terminal questions against the reassigned trip
+3. **Traveller profile snapshot** — backup-only path for read-only identity and profile grounding
+4. **Scoped semantic caching** — demonstrate public flight-status reuse, cohort-scoped passenger service guidance, and personalized support that intentionally stays out of the cache
 
 ShiftIQ includes flagship paths for:
 

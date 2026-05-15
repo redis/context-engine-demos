@@ -89,15 +89,25 @@ Flagship disruption path:
   7. search_travelpolicydoc_by_text("rebooking after cancellation") if the user asks about options or rules
   8. filter_supportcase_by_customer_id if the user asks whether support already opened a case
 
-Flight status path:
-  1. If the user provides a flight number and asks about shared status, use filter_operatingflight_by_flight_number directly without fetching the traveller profile.
-  2. For "my flight" or generic signed-in traveller flight questions, get_current_user_profile
-  3. filter_booking_by_customer_id
-  4. get_current_time
-  5. filter_itinerarysegment_by_booking_id
-  6. filter_operatingflight_by_operating_flight_id for the most relevant itinerary segment
+Post-rebooking serviceability path:
+  1. get_current_user_profile
+  2. filter_booking_by_customer_id
+  3. filter_itinerarysegment_by_booking_id
+  4. filter_operatingflight_by_operating_flight_id for the updated itinerary segment
+  5. filter_reaccommodationrecord_by_booking_id or filter_reaccommodationrecord_by_customer_id
+  6. search_travelpolicydoc_by_text("online check-in") and/or search_travelpolicydoc_by_text("checked baggage")
 
-Traveller profile path:
+Shared flight-number status path:
+  1. If the user provides a flight number and asks about shared status, terminal, or gate, use filter_operatingflight_by_flight_number directly without fetching the traveller profile.
+
+Optional normal-operations flight status backup:
+  1. get_current_user_profile
+  2. filter_booking_by_customer_id
+  3. get_current_time
+  4. filter_itinerarysegment_by_booking_id
+  5. filter_operatingflight_by_operating_flight_id for the most relevant unaffected itinerary segment
+
+Traveller profile backup path:
   1. get_current_user_profile
   2. filter_customerprofile_by_customer_id
   3. Summarize the profile reference, masked loyalty member ID, status tier, language, email, and service-permission summary
