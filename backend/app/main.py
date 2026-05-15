@@ -152,6 +152,69 @@ def _llm_phase_label(*, llm_call_index: int, tool_calls_seen: int) -> str:
     return "Reason about the request and decide the next step."
 
 
+def _parse_tool_output(raw_output: Any) -> dict[str, Any]:
+    if raw_output is None or raw_output == "":
+        return {}
+    if isinstance(raw_output, dict):
+        return raw_output
+    try:
+        output = json.loads(str(raw_output))
+    except (json.JSONDecodeError, TypeError):
+        return {"result": str(raw_output)}
+    return output if isinstance(output, dict) else {"result": output}
+
+
+def _tool_error_payload(error: Any, *, fallback: str = "Tool failed.") -> dict[str, str]:
+    if error is None:
+        return {"error": fallback}
+    return {
+        "error": str(error) or fallback,
+        "type": error.__class__.__name__,
+    }
+
+
+def _tool_duration_ms(start: float | None) -> int:
+    if start is None:
+        return 1
+    return max(round((perf_counter() - start) * 1000), 1)
+
+
+def _terminal_tool_result_event(
+    *,
+    name: str,
+    run_id: str,
+    start: float | None,
+    payload: dict[str, Any],
+    timer: Timer,
+) -> str:
+    return format_sse_event(
+        "tool-result",
+        toolName=name,
+        toolKind=_tool_kind(name),
+        runId=run_id,
+        payload=payload,
+        durationMs=_tool_duration_ms(start),
+        ts=timer.elapsed_ms(),
+    )
+
+
+def _pop_pending_tool_for_event(
+    pending_tools: dict[str, dict[str, Any]],
+    *,
+    run_id: str,
+    name: str,
+) -> tuple[str, dict[str, Any] | None]:
+    if run_id:
+        return run_id, pending_tools.pop(run_id, None)
+
+    for pending_run_id, pending in list(pending_tools.items()):
+        if name and pending.get("name") != name:
+            continue
+        return pending_run_id, pending_tools.pop(pending_run_id)
+
+    return run_id, None
+
+
 @app.get("/api/health")
 async def health() -> JSONResponse:
     mcp_tool_names = [tool.get("name", "") for tool in await cs_service.list_tools()]
@@ -192,7 +255,7 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
 
     config = {"configurable": {"thread_id": thread_id}}
 
-    tool_start_times: dict[str, float] = {}
+    pending_tools: dict[str, dict[str, Any]] = {}
     llm_start_times: dict[str, float] = {}
     llm_step_ids: dict[str, str] = {}
     llm_call_counter = 0
@@ -209,9 +272,11 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
 
             if kind == "on_tool_start":
                 name = event.get("name", "")
-                tool_input = event["data"].get("input", {})
-                tool_start_times[event["run_id"]] = perf_counter()
                 tool_calls_seen += 1
+                run_id = str(event.get("run_id") or f"{name}-{tool_calls_seen}")
+                data = event.get("data") or {}
+                tool_input = data.get("input", {}) if isinstance(data, dict) else {}
+                pending_tools[run_id] = {"name": name, "start": perf_counter()}
                 thinking_step = _thinking_step_for_tool(name, tool_input)
                 if thinking_step and thinking_step != last_thinking_step:
                     last_thinking_step = thinking_step
@@ -220,28 +285,52 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
                     "tool-call",
                     toolName=name,
                     toolKind=_tool_kind(name),
-                    runId=event["run_id"],
+                    runId=run_id,
                     payload=tool_input if isinstance(tool_input, dict) else {"input": tool_input},
                     ts=timer.elapsed_ms(),
                 )
 
             elif kind == "on_tool_end":
                 name = event.get("name", "")
-                raw_output = event["data"].get("output", "")
-                try:
-                    output = json.loads(str(raw_output)) if raw_output else {}
-                except (json.JSONDecodeError, TypeError):
-                    output = {"result": str(raw_output)}
-                start = tool_start_times.pop(event["run_id"], perf_counter())
-                duration_ms = max(round((perf_counter() - start) * 1000), 1)
+                run_id = str(event.get("run_id") or "")
+                run_id, pending = _pop_pending_tool_for_event(
+                    pending_tools,
+                    run_id=run_id,
+                    name=name,
+                )
+                if pending and not name:
+                    name = str(pending.get("name", ""))
+                data = event.get("data") or {}
+                raw_output = data.get("output", "") if isinstance(data, dict) else ""
+                output = _parse_tool_output(raw_output)
                 yield format_sse_event(
                     "tool-result",
                     toolName=name,
                     toolKind=_tool_kind(name),
-                    runId=event["run_id"],
+                    runId=run_id,
                     payload=output,
-                    durationMs=duration_ms,
+                    durationMs=_tool_duration_ms(pending.get("start") if pending else None),
                     ts=timer.elapsed_ms(),
+                )
+
+            elif kind == "on_tool_error":
+                name = event.get("name", "")
+                run_id = str(event.get("run_id") or "")
+                run_id, pending = _pop_pending_tool_for_event(
+                    pending_tools,
+                    run_id=run_id,
+                    name=name,
+                )
+                if pending and not name:
+                    name = str(pending.get("name", ""))
+                data = event.get("data") or {}
+                error = data.get("error") if isinstance(data, dict) else None
+                yield _terminal_tool_result_event(
+                    name=name,
+                    run_id=run_id,
+                    start=pending.get("start") if pending else None,
+                    payload=_tool_error_payload(error),
+                    timer=timer,
                 )
 
             elif kind == "on_chat_model_start":
@@ -315,6 +404,15 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
     except Exception as exc:
         code, message = classify_openai_exception(exc)
         error_code = "budget_exceeded" if code == "budget_exceeded" else "openai_error"
+        for run_id, pending in list(pending_tools.items()):
+            yield _terminal_tool_result_event(
+                name=str(pending.get("name", "")),
+                run_id=run_id,
+                start=pending.get("start"),
+                payload={"error": message, "type": exc.__class__.__name__},
+                timer=timer,
+            )
+        pending_tools.clear()
         yield format_sse_event(
             "error",
             errorCode=error_code,

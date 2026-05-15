@@ -216,8 +216,28 @@ function BrandLogo({ src, className = "brand-logo" }: { src?: string; className?
   );
 }
 
-function toolStatusLabel(tool: MergedToolEvent) {
-  return tool.resultPayload === undefined ? "Running" : "Done";
+function toolResultHasError(tool: MergedToolEvent) {
+  const payload = tool.resultPayload;
+  return !!payload && typeof payload === "object" && !Array.isArray(payload) && "error" in payload;
+}
+
+function toolStatusKind(tool: MergedToolEvent, streamComplete: boolean) {
+  if (toolResultHasError(tool)) return "error";
+  if (tool.resultPayload === undefined) return streamComplete ? "missing" : "running";
+  return "done";
+}
+
+function toolStatusLabel(status: ReturnType<typeof toolStatusKind>) {
+  switch (status) {
+    case "error":
+      return "Error";
+    case "missing":
+      return "No response";
+    case "running":
+      return "Running";
+    case "done":
+      return "Done";
+  }
 }
 
 function thinkingStepStatusLabel(step: ThinkingStep) {
@@ -923,6 +943,7 @@ export default function App() {
               const chartPayload = findTimeSeriesPayload(toolRows);
               const traceTimeline = buildTraceTimeline(message.thinkingSteps, toolRows);
               const isAssistant = message.role === "assistant";
+              const streamComplete = message.totalElapsedMs !== undefined;
               const lastStatus = isAssistant && message.statusMessages.length > 0 ? message.statusMessages[message.statusMessages.length - 1] : null;
               const showStatus = isAssistant && !message.content && lastStatus;
               return (
@@ -975,16 +996,23 @@ export default function App() {
                               <div className="tool-header">
                                 <span className={`tool-source ${entry.tool.toolKind}`}>{toolKindLabel(entry.tool.toolKind)}</span>
                                 <span className="tool-name">{entry.tool.toolName}</span>
-                                <span className={`tool-status ${entry.tool.resultPayload === undefined ? "is-running" : "is-done"}`}>
-                                  {entry.tool.resultPayload === undefined && <span className="tool-spinner" aria-hidden="true" />}
-                                  {toolStatusLabel(entry.tool)}
-                                </span>
+                                {(() => {
+                                  const status = toolStatusKind(entry.tool, streamComplete);
+                                  return (
+                                    <span className={`tool-status is-${status}`}>
+                                      {status === "running" && <span className="tool-spinner" aria-hidden="true" />}
+                                      {toolStatusLabel(status)}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <div className="tool-summary-right">
                                 {entry.tool.durationMs !== undefined ? (
                                   <span className="trace-latency">{entry.tool.durationMs}ms</span>
                                 ) : (
-                                  <span className="trace-latency trace-latency-pending">In flight</span>
+                                  <span className="trace-latency trace-latency-pending">
+                                    {streamComplete ? "No result" : "In flight"}
+                                  </span>
                                 )}
                               </div>
                             </summary>
@@ -999,6 +1027,10 @@ export default function App() {
                                 <div className="tool-detail-section">
                                   <div className="tool-detail-label">Response</div>
                                   <ToolPayloadJson payload={entry.tool.resultPayload} />
+                                </div>
+                              ) : streamComplete ? (
+                                <div className="tool-detail-pending">
+                                  No tool response was emitted before the stream completed.
                                 </div>
                               ) : (
                                 <div className="tool-detail-pending">
