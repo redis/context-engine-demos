@@ -87,6 +87,38 @@ def test_cs_event_stream_emits_terminal_tool_result_on_tool_error(monkeypatch):
     assert events[-1]["type"] == "done"
 
 
+def test_cs_event_stream_matches_missing_run_id_tool_error_to_pending_call(monkeypatch):
+    import backend.app.main as main_mod
+
+    class FakeAgent:
+        async def astream_events(self, *_args, **_kwargs):
+            yield {
+                "event": "on_tool_start",
+                "name": "filter_order_by_customer_id",
+                "data": {"input": {"customer_id": "CUST_DEMO_001"}},
+            }
+            yield {
+                "event": "on_tool_error",
+                "name": "filter_order_by_customer_id",
+                "data": {"error": ValueError("missing required field: value")},
+            }
+
+    async def fake_get_agent():
+        return FakeAgent()
+
+    monkeypatch.setattr(main_mod, "get_agent", fake_get_agent)
+    monkeypatch.setitem(main_mod.runtime_config, "enable_post_model_verifier", False)
+
+    events = asyncio.run(_collect_chat_events(_chat_request()))
+    tool_call = next(event for event in events if event["type"] == "tool-call")
+    tool_result = next(event for event in events if event["type"] == "tool-result")
+
+    assert tool_call["runId"] == "filter_order_by_customer_id-1"
+    assert tool_result["runId"] == tool_call["runId"]
+    assert tool_result["payload"]["error"] == "missing required field: value"
+    assert events[-1]["type"] == "done"
+
+
 def test_cs_event_stream_flushes_pending_tool_result_before_stream_error(monkeypatch):
     import backend.app.main as main_mod
 

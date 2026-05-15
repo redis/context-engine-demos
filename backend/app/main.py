@@ -180,6 +180,23 @@ def _terminal_tool_result_event(
     )
 
 
+def _pop_pending_tool_for_event(
+    pending_tools: dict[str, dict[str, Any]],
+    *,
+    run_id: str,
+    name: str,
+) -> tuple[str, dict[str, Any] | None]:
+    if run_id:
+        return run_id, pending_tools.pop(run_id, None)
+
+    for pending_run_id, pending in list(pending_tools.items()):
+        if name and pending.get("name") != name:
+            continue
+        return pending_run_id, pending_tools.pop(pending_run_id)
+
+    return run_id, None
+
+
 @app.get("/api/health")
 async def health() -> JSONResponse:
     mcp_tool_names = [tool.get("name", "") for tool in await cs_service.list_tools()]
@@ -258,7 +275,11 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
             elif kind == "on_tool_end":
                 name = event.get("name", "")
                 run_id = str(event.get("run_id") or "")
-                pending = pending_tools.pop(run_id, None)
+                run_id, pending = _pop_pending_tool_for_event(
+                    pending_tools,
+                    run_id=run_id,
+                    name=name,
+                )
                 if pending and not name:
                     name = str(pending.get("name", ""))
                 data = event.get("data") or {}
@@ -277,7 +298,11 @@ async def cs_event_stream(request: ChatRequest) -> AsyncIterator[str]:
             elif kind == "on_tool_error":
                 name = event.get("name", "")
                 run_id = str(event.get("run_id") or "")
-                pending = pending_tools.pop(run_id, None)
+                run_id, pending = _pop_pending_tool_for_event(
+                    pending_tools,
+                    run_id=run_id,
+                    name=name,
+                )
                 if pending and not name:
                     name = str(pending.get("name", ""))
                 data = event.get("data") or {}
