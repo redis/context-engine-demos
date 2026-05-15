@@ -441,6 +441,14 @@ button { cursor: pointer; }
   background: rgba(255,255,255,0.06);
   color: var(--muted);
 }
+.tool-status.is-error {
+  background: rgba(255, 68, 56, 0.16);
+  color: #ffd0c8;
+}
+.tool-status.is-missing {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.58);
+}
 .tool-spinner {
   width: 10px;
   height: 10px;

@@ -351,6 +351,18 @@ def _make_mcp_tool(
         func=lambda **kw: "",  # sync stub — we use coroutine
         coroutine=fn,
         args_schema=args_model,
+        handle_validation_error=_format_tool_validation_error,
+    )
+
+
+def _format_tool_validation_error(error: BaseException) -> str:
+    return json.dumps(
+        {
+            "error": "Tool input validation failed.",
+            "type": error.__class__.__name__,
+            "detail": str(error),
+        },
+        default=str,
     )
 
 
